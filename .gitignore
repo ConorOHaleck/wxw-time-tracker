@@ -1,0 +1,23 @@
+node_modules/
+dist/
+out/
+
+# Generated installer icon (run `npm run icon`)
+build/
+
+# Local runtime state and secrets — never commit these
+config.json
+settings.json
+state.json
+*.log
+logs/
+
+# Superseded by GitHub Releases distribution
+wxw-time-tracker-src.zip
+
+# Local editor/assistant settings
+.claude/
+
+# OS cruft
+.DS_Store
+Thumbs.db

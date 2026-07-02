@@ -1,0 +1,63 @@
+==========================================================
+  WxW Time Tracker — Making the Mac version
+==========================================================
+
+You only do this ONCE, to create the installer. After that,
+anyone can use the installer with no technical steps at all.
+
+
+WHAT YOU NEED
+-------------
+A Mac, and about 10 minutes the first time.
+
+
+STEP 1 — Install Node (one time only)
+-------------------------------------
+1. Go to   https://nodejs.org
+2. Click the big green button that says "LTS".
+3. Open the file it downloads and click Continue / Install
+   (just like installing any other Mac app).
+
+(If a message later says "npm: command not found", Node didn't
+finish installing — repeat this step.)
+
+
+STEP 2 — Build the app
+----------------------
+1. Double-click  "build-mac.command"  (it's in this folder).
+2. A black window opens and does everything automatically.
+   This takes a few minutes — let it run.
+3. When it finishes, a folder called "dist" opens with a file
+   ending in  .dmg  — that's your installer.
+
+If double-clicking does nothing, opens it in TextEdit, or says
+it "cannot be opened", use this sure-fire way instead:
+   1. Open the "Terminal" app (press Cmd+Space, type Terminal,
+      press Return).
+   2. In the Terminal window, type the word  bash  followed by
+      a single space.
+   3. Drag the "build-mac.command" file from Finder into the
+      Terminal window (this pastes its location for you).
+   4. Press Return. It will build the app the same way.
+
+
+STEP 3 — Give people the app
+----------------------------
+Share the  .dmg  file from the "dist" folder. To install it,
+anyone just:
+   1. Double-clicks the .dmg
+   2. Drags "WxW Time Tracker" into the Applications folder
+   3. The first time only: right-clicks the app and chooses
+      Open, then Open again (this clears Apple's warning for an
+      app that isn't signed).
+
+That's it — from then on it opens like any normal app, and the
+in-app setup screen walks them through entering their Airtable
+token and picking their device.
+
+
+PREFER NOT TO USE A MAC AT ALL?
+-------------------------------
+The build can instead run automatically in the cloud (GitHub
+Actions), so the Mac installer becomes a simple download with no
+Mac and no Terminal involved. Ask and this can be set up.

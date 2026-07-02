@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'" />
+    <title>WxW Time Tracker</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <div id="dot" class="dot offline"></div>
+      <h1>WxW Time Tracker</h1>
+      <button id="settingsBtn" class="back-btn hidden" title="Back to setup">← Back</button>
+    </header>
+
+    <div id="fatal" class="fatal hidden"></div>
+
+    <!-- ============ SETUP VIEW ============ -->
+    <section id="setupView" class="hidden">
+      <p class="lead">Let's get you tracking. This takes about a minute.</p>
+
+      <div class="step">
+        <div class="step-head"><span class="num">1</span> Connect to Airtable</div>
+        <label for="token">Airtable access token</label>
+        <input id="token" type="password" placeholder="patXXXXXXXXXXXXXX..." autocomplete="off" spellcheck="false" />
+        <div class="hint">
+          Paste a personal access token with read &amp; write access to the WxW Delivery base.
+          <a href="#" id="tokenHelp">Where do I get one?</a>
+        </div>
+        <button id="testBtn" class="secondary">Test connection</button>
+        <div id="testMsg" class="msg hidden"></div>
+      </div>
+
+      <div class="step" id="deviceStep" aria-disabled="true">
+        <div class="step-head"><span class="num">2</span> Which TimeFlip is yours?</div>
+        <select id="deviceSelect" disabled>
+          <option value="">Test your connection first…</option>
+        </select>
+        <div class="hint">Pick the device assigned to you. This decides whose hours get logged.</div>
+      </div>
+
+      <div class="step">
+        <div class="step-head"><span class="num">3</span> Where should time go?</div>
+        <label class="radio">
+          <input type="radio" name="target" value="testing" checked />
+          <span><b>Hours Testing</b> — practice safely (recommended while trying it out)</span>
+        </label>
+        <label class="radio">
+          <input type="radio" name="target" value="production" />
+          <span><b>Hours</b> — real hours that feed payroll</span>
+        </label>
+        <div id="prodWarn" class="warn hidden">⚠ The <b>Hours</b> table feeds timesheets and payroll. Only use it once you've confirmed everything is working.</div>
+      </div>
+
+      <details class="advanced">
+        <summary>Advanced options</summary>
+        <label for="bleName">Bluetooth device name to look for</label>
+        <input id="bleName" type="text" placeholder="TimeFlip" />
+        <div class="hint">Leave as <b>TimeFlip</b> unless a Bluetooth scanner shows your die broadcasting a different name — then enter that name (or the start of it) here.</div>
+        <label for="minSession">Ignore flips shorter than (seconds)</label>
+        <input id="minSession" type="number" min="0" value="30" />
+        <label for="pauseFaces">Pause faces (face numbers that don't track, comma-separated)</label>
+        <input id="pauseFaces" type="text" placeholder="e.g. 12" />
+      </details>
+
+      <button id="saveBtn" disabled>Save &amp; start tracking</button>
+      <div id="saveMsg" class="msg hidden"></div>
+    </section>
+
+    <!-- ============ STATUS VIEW ============ -->
+    <section id="statusView" class="hidden">
+      <div class="card">
+        <div class="face" id="faceBig">–</div>
+        <div class="face-label" id="faceLabel">Waiting for device…</div>
+        <div class="elapsed-big" id="elapsed"></div>
+      </div>
+
+      <div class="grid">
+        <div class="kv"><span>Connection</span><b id="conn">—</b></div>
+        <div class="kv"><span>Tracking now</span><b id="trackState">—</b></div>
+        <div class="kv"><span>Started</span><b id="sessionStart">—</b></div>
+        <div class="kv"><span>Faces set up</span><b id="faceCount">—</b></div>
+        <div class="kv"><span>Saving time to</span><b id="hoursTable">—</b></div>
+      </div>
+
+      <section class="actions">
+        <button id="reconcileBtn" class="secondary">Sync past time now</button>
+      </section>
+    </section>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,67 @@
+name: Build & Release
+
+# Builds the Mac (.dmg) and Windows (.exe) installers in the cloud.
+#
+# Runs when you publish a GitHub Release (Releases -> Draft a new release ->
+# pick/create a tag like v0.1.0 -> Publish). CI then attaches both installers
+# to that release for users to download. Also has a manual "Run workflow"
+# button (Actions tab) that builds and uploads the installers as artifacts
+# without touching a release.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installer (${{ matrix.platform }})
+        env:
+          # We don't code-sign; keep electron-builder from probing for a cert.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist:${{ matrix.platform }}
+
+      - name: Upload installers as build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wxw-time-tracker-${{ matrix.platform }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.blockmap
+          if-no-files-found: warn
+
+      - name: Attach installers to the release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            dist/*.exe
+            dist/*.dmg
