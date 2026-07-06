@@ -25,6 +25,15 @@ let userData = null;
 let currentSettings = null;
 let lastSnapshot = { connected: false, bleState: 'idle' };
 
+// BLE device selection state.
+let bleMatch = {}; // { namePrefix, peripheralId } — mutated when a device is learned
+let blePairing = { active: false, callback: null }; // manual "choose device" session
+const discoveredDevices = new Map(); // deviceId -> advertised name (for the picker)
+
+function devicesList() {
+  return Array.from(discoveredDevices, ([id, name]) => ({ id, name }));
+}
+
 function iconPath() {
   // Packaged into the app via src/** so it resolves both in dev and production.
   return path.join(__dirname, '..', 'assets', 'icon.png');
@@ -63,9 +72,10 @@ function createWindow() {
 
 /**
  * Hidden background window that runs the Web Bluetooth transport.
- * @param {{namePrefix?:string, peripheralId?:string}} bleMatch
+ * Selection is driven here via the 'select-bluetooth-device' event and the
+ * module-level `bleMatch` / `blePairing` state.
  */
-function createBleWindow(bleMatch) {
+function createBleWindow() {
   bleWindow = new BrowserWindow({
     show: false,
     webPreferences: {
@@ -79,23 +89,35 @@ function createBleWindow(bleMatch) {
   ses.setPermissionCheckHandler(() => true);
   ses.setDevicePermissionHandler(() => true);
 
-  // Auto-pick the configured device — no chooser popup.
-  const seenDevices = new Set();
+  discoveredDevices.clear();
   bleWindow.webContents.on('select-bluetooth-device', (event, devices, callback) => {
     event.preventDefault();
-    // Log every newly-seen device so we can confirm the die's advertised name.
+
+    // Track everything we see and stream it to the setup UI's device picker.
+    let changed = false;
     for (const d of devices) {
-      if (!seenDevices.has(d.deviceId)) {
-        seenDevices.add(d.deviceId);
+      if (!discoveredDevices.has(d.deviceId)) {
+        discoveredDevices.set(d.deviceId, d.deviceName || '');
         log.info('ble: discovered device', `name="${d.deviceName || '(no name)'}"`, 'id=' + d.deviceId);
+        changed = true;
       }
     }
+    if (changed) sendToRenderer('ble-devices', devicesList());
+
+    // Manual pairing: wait for the user to choose from the list.
+    if (blePairing.active) {
+      blePairing.callback = callback;
+      return;
+    }
+
+    // Auto mode: connect to the exact paired device (by id) or, if we don't have
+    // one yet, the first device whose name matches the prefix. Never pick an
+    // unrelated device — if nothing matches, keep scanning.
     const { namePrefix, peripheralId } = bleMatch || {};
     const pick = devices.find((d) => {
       if (peripheralId && d.deviceId === peripheralId) return true;
       const name = (d.deviceName || '').toLowerCase();
-      if (namePrefix && name.includes(String(namePrefix).toLowerCase())) return true;
-      return !namePrefix && !peripheralId;
+      return namePrefix && name.includes(String(namePrefix).toLowerCase());
     });
     if (pick) {
       log.info('ble: auto-selected', pick.deviceName, pick.deviceId);
@@ -105,6 +127,20 @@ function createBleWindow(bleMatch) {
 
   bleWindow.loadFile(path.join(__dirname, '..', 'renderer', 'ble.html'));
   return bleWindow;
+}
+
+/** Remember the exact device we connected to, so future launches are seamless. */
+function learnDevice(deviceId, deviceName) {
+  if (!deviceId) return;
+  bleMatch.peripheralId = deviceId;
+  if (currentSettings.bleDeviceId !== deviceId) {
+    currentSettings = settingsStore.save(userData, {
+      ...currentSettings,
+      bleDeviceId: deviceId,
+      bleDeviceName: deviceName || currentSettings.bleDeviceName,
+    });
+    log.info('app: paired/learned device', deviceName || '(unnamed)', deviceId);
+  }
 }
 
 function createTray() {
@@ -198,15 +234,29 @@ async function startEngine() {
     return { ok: false, error: err.message };
   }
 
-  device = new BleBridge({ bleMatch: cfg.device.bleMatch, password: cfg.device.password });
+  bleMatch = cfg.device.bleMatch; // module ref; mutated by learnDevice()
+  device = new BleBridge({ bleMatch, password: cfg.device.password });
   engine = new SyncEngine({ device, mapper, store, airtable, cfg });
   engine.on('update', (snapshot) => {
     lastSnapshot = snapshot;
     sendToRenderer('snapshot', snapshot);
     refreshTrayMenu();
   });
+  device.on('ready', ({ deviceId, deviceName }) => {
+    blePairing.active = false;
+    learnDevice(deviceId, deviceName);
+    sendToRenderer('ble-paired', { deviceId, deviceName });
+  });
+  device.on('wrong-device', ({ deviceName }) => {
+    // Manually-picked device isn't a TimeFlip — drop it and re-scan so the user
+    // can pick again (a fresh scan is needed since the previous one resolved).
+    bleMatch.peripheralId = currentSettings.bleDeviceId || '';
+    blePairing.active = true;
+    sendToRenderer('ble-wrong-device', { deviceName });
+    if (device) device.start();
+  });
 
-  createBleWindow(cfg.device.bleMatch);
+  createBleWindow();
   device.attachWindow(bleWindow);
   engine.start();
   bleWindow.webContents.once('did-finish-load', () => {
@@ -243,6 +293,49 @@ ipcMain.handle('get-snapshot', () => (engine ? engine.snapshot() : lastSnapshot)
 ipcMain.handle('reconcile-now', async () => {
   if (engine) await engine._reconcile();
   return engine ? engine.snapshot() : lastSnapshot;
+});
+
+// ---- IPC: device pairing ----
+
+// Enter manual "choose device" mode and return what we've discovered so far.
+// The list also streams live via the 'ble-devices' event as more appear.
+ipcMain.handle('ble:list-devices', () => {
+  blePairing.active = true;
+  return devicesList();
+});
+
+// The user picked a device from the list — connect to that exact one.
+ipcMain.handle('ble:choose-device', (_e, { deviceId }) => {
+  if (!blePairing.callback) {
+    return {
+      ok: false,
+      error: 'The scan isn’t active. If the app is already connected, use “Forget device” first.',
+    };
+  }
+  const cb = blePairing.callback;
+  blePairing.callback = null;
+  blePairing.active = false;
+  bleMatch.peripheralId = deviceId; // connect to this one; persisted on ready
+  cb(deviceId);
+  return { ok: true };
+});
+
+// Close the picker without choosing — resume automatic connection.
+ipcMain.handle('ble:cancel-pairing', () => {
+  blePairing.active = false;
+  return { ok: true };
+});
+
+// Forget the paired device and re-scan from scratch (for switching devices).
+ipcMain.handle('ble:forget-device', async () => {
+  currentSettings = settingsStore.save(userData, {
+    ...currentSettings,
+    bleDeviceId: '',
+    bleDeviceName: '',
+  });
+  blePairing.active = true; // the fresh scan will wait for a manual pick
+  await startEngine();
+  return { ok: true };
 });
 
 // ---- IPC: setup ----

@@ -77,10 +77,27 @@
 
       <div class="grid">
         <div class="kv"><span>Connection</span><b id="conn">—</b></div>
+        <div class="kv"><span>Device</span><b id="deviceName">—</b></div>
         <div class="kv"><span>Tracking now</span><b id="trackState">—</b></div>
         <div class="kv"><span>Started</span><b id="sessionStart">—</b></div>
         <div class="kv"><span>Faces set up</span><b id="faceCount">—</b></div>
         <div class="kv"><span>Saving time to</span><b id="hoursTable">—</b></div>
+      </div>
+
+      <!-- Device picker: shown on demand, or nudged when we can't auto-connect. -->
+      <div class="device-bar">
+        <span id="deviceHint">Connecting to your TimeFlip…</span>
+        <button id="chooseDeviceBtn" class="linkish">Choose device</button>
+      </div>
+
+      <div id="devicePicker" class="picker hidden">
+        <div class="picker-head">Pick your TimeFlip</div>
+        <div id="deviceList" class="device-list"><div class="muted-row">Scanning…</div></div>
+        <div id="pickerMsg" class="hint">Don’t see it? Flip the die to wake it, and make sure it isn’t connected to the TimeFlip phone app or another program.</div>
+        <div class="picker-actions">
+          <button id="cancelPickBtn" class="secondary">Cancel</button>
+          <button id="forgetBtn" class="linkish">Forget paired device</button>
+        </div>
       </div>
 
       <section class="actions">

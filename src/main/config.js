@@ -31,7 +31,13 @@ function buildConfig(settings) {
     device: {
       timeflipRecordId: settings.timeflipRecordId,
       deviceIdValue: '',
-      bleMatch: { namePrefix: settings.bleNamePrefix || 'TimeFlip', peripheralId: '' },
+      // peripheralId (the exact paired device) takes precedence over the name
+      // prefix. Once a device is paired/learned, connection no longer depends on
+      // the advertised name at all.
+      bleMatch: {
+        namePrefix: settings.bleNamePrefix || 'TimeFlip',
+        peripheralId: settings.bleDeviceId || '',
+      },
       password: '000000',
     },
     tracking: {

@@ -58,14 +58,27 @@ class BleBridge extends EventEmitter {
       this.emit('status', { state });
     });
 
-    ipcMain.on('ble:ready', (_e, { firmware, deviceName, facet }) => {
+    ipcMain.on('ble:ready', (_e, { firmware, deviceName, deviceId, facet }) => {
       this.firmware = firmware || 0;
       this.deviceName = deviceName || null;
+      this.deviceId = deviceId || null;
       this.lastFacet = facet || 0;
       this.state = 'ready';
-      log.info('ble: ready, firmware', this.firmware, 'name', this.deviceName, 'facet', this.lastFacet);
-      this.emit('ready', { firmware: this.firmware, deviceName: this.deviceName });
+      log.info(
+        'ble: ready, firmware', this.firmware, 'name', this.deviceName, 'id', this.deviceId,
+        'facet', this.lastFacet
+      );
+      this.emit('ready', {
+        firmware: this.firmware,
+        deviceName: this.deviceName,
+        deviceId: this.deviceId,
+      });
       if (this.lastFacet > 0) this.emit('facet', { facet: this.lastFacet });
+    });
+
+    ipcMain.on('ble:wrong-device', (_e, { deviceName }) => {
+      log.warn('ble: selected device is not a TimeFlip:', deviceName || '(unnamed)');
+      this.emit('wrong-device', { deviceName: deviceName || null });
     });
 
     ipcMain.on('ble:facet', (_e, { facet }) => {
@@ -106,7 +119,14 @@ class BleBridge extends EventEmitter {
 
   /** Remove the ipcMain listeners this bridge registered (call when tearing down). */
   dispose() {
-    for (const ch of ['ble:status', 'ble:ready', 'ble:facet', 'ble:error', 'ble:command-result']) {
+    for (const ch of [
+      'ble:status',
+      'ble:ready',
+      'ble:facet',
+      'ble:error',
+      'ble:wrong-device',
+      'ble:command-result',
+    ]) {
       ipcMain.removeAllListeners(ch);
     }
     for (const [, p] of this._pending) p.reject(new Error('disposed'));

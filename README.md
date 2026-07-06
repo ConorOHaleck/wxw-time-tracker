@@ -73,6 +73,23 @@ field id is baked into the app.
 (built-in is fine), and an Airtable token with read+write on base `appOa0ZMtkRoHMSW3`. On
 macOS, grant Bluetooth permission when prompted.
 
+### Connecting to your die
+
+You don't enter any device ID. The app finds and connects on its own:
+
+- On first run it connects to a nearby die (matched loosely by name) and then **remembers that
+  exact device** — every launch after that reconnects to it automatically, no matter what it's
+  named.
+- If it can't find your die automatically, click **Choose device** on the main screen and pick
+  it from the list of nearby Bluetooth devices (likely TimeFlips are flagged). That choice is
+  remembered too.
+- The app confirms a device really is a TimeFlip (by its Bluetooth service) before using it, so
+  it never latches onto the wrong gadget.
+
+If it's stuck on "Searching…": **flip the die to wake it**, and make sure it isn't already
+connected to the **TimeFlip phone app** or a Bluetooth scanner — a die only allows one
+connection at a time. To switch to a different die, use **Choose device → Forget paired device**.
+
 ## For developers
 
 ```bash

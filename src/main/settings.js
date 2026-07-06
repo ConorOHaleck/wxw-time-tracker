@@ -22,6 +22,11 @@ const DEFAULTS = {
   timeflipRecordId: '',
   useProduction: false,
   bleNamePrefix: 'TimeFlip',
+  // The exact paired device, learned on first successful connect (or set via the
+  // "Choose device" picker). Once set, the app reconnects to this exact device
+  // regardless of its advertised name. Web Bluetooth ids are stable per machine.
+  bleDeviceId: '',
+  bleDeviceName: '',
   ...TRACKING_DEFAULTS,
 };
 

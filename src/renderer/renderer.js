@@ -2,6 +2,8 @@
 
 const $ = (id) => document.getElementById(id);
 let snapshot = null;
+let pairedName = '';
+let devices = [];
 
 // Friendly names for the two Hours tables (ids baked into the app).
 const TABLE_LABELS = {
@@ -31,6 +33,17 @@ function render(s) {
   const connecting = ['connecting', 'scanning', 'authenticating'].includes(s2.bleState);
   dot.className = 'dot ' + (s2.connected ? 'online' : connecting ? 'connecting' : 'offline');
   $('conn').textContent = s2.connected ? 'Connected' : s2.bleState || 'disconnected';
+
+  $('deviceName').textContent = s2.connected
+    ? pairedName || 'Connected'
+    : pairedName
+      ? `${pairedName} (offline)`
+      : 'Not paired';
+  $('deviceHint').textContent = s2.connected
+    ? `Connected to ${pairedName || 'your TimeFlip'}`
+    : pairedName
+      ? 'Reconnecting to your TimeFlip…'
+      : 'Searching for your TimeFlip…';
 
   const faceEl = $('faceBig');
   const face = s2.currentFacet > 0 ? s2.currentFacet : s2.deviceFacet;
@@ -172,6 +185,75 @@ async function saveSettings() {
   }
 }
 
+// ---------- device picker ----------
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+}
+
+function renderDevices(list) {
+  if (list) devices = list;
+  const el = $('deviceList');
+  if (!devices.length) {
+    el.innerHTML = '<div class="muted-row">Scanning… flip the die to wake it.</div>';
+    return;
+  }
+  // Show likely-TimeFlip devices first.
+  const sorted = [...devices].sort((a, b) => (/timeflip/i.test(b.name || '') ? 1 : 0) - (/timeflip/i.test(a.name || '') ? 1 : 0));
+  el.innerHTML = '';
+  for (const d of sorted) {
+    const row = document.createElement('button');
+    row.className = 'device-row';
+    const likely = /timeflip/i.test(d.name || '');
+    row.innerHTML =
+      `<span class="dn">${escapeHtml(d.name || '(unnamed device)')}${likely ? ' <span class="tag">TimeFlip?</span>' : ''}</span>` +
+      `<span class="di">${escapeHtml((d.id || '').slice(0, 8))}…</span>`;
+    row.addEventListener('click', () => pickDevice(d.id));
+    el.appendChild(row);
+  }
+}
+
+function pickerMsg(text, isError) {
+  const el = $('pickerMsg');
+  el.textContent = text;
+  el.className = isError ? 'msg error' : 'hint';
+}
+
+async function openPicker() {
+  $('devicePicker').classList.remove('hidden');
+  pickerMsg('Don’t see it? Flip the die to wake it, and make sure it isn’t connected to the phone app or another program.', false);
+  renderDevices(await window.timeflip.listDevices());
+}
+function closePicker() {
+  $('devicePicker').classList.add('hidden');
+}
+async function pickDevice(id) {
+  const res = await window.timeflip.chooseDevice(id);
+  if (res && res.ok) pickerMsg('Connecting…', false);
+  else pickerMsg((res && res.error) || 'Could not select that device.', true);
+}
+
+window.timeflip.onDevices(renderDevices);
+window.timeflip.onPaired((d) => {
+  pairedName = (d && d.deviceName) || pairedName;
+  closePicker();
+  render(snapshot);
+});
+window.timeflip.onWrongDevice((d) => {
+  pickerMsg(`“${(d && d.deviceName) || 'That device'}” isn’t a TimeFlip — pick another.`, true);
+});
+
+$('chooseDeviceBtn').addEventListener('click', openPicker);
+$('cancelPickBtn').addEventListener('click', async () => {
+  await window.timeflip.cancelPairing();
+  closePicker();
+});
+$('forgetBtn').addEventListener('click', async () => {
+  pairedName = '';
+  await window.timeflip.forgetDevice();
+  openPicker();
+});
+
 // ---------- wiring ----------
 
 window.timeflip.onSnapshot(render);
@@ -208,6 +290,7 @@ $('reconcileBtn').addEventListener('click', async () => {
 (async function boot() {
   const state = await window.timeflip.getState();
   window.__savedRecordId = state.settings && state.settings.timeflipRecordId;
+  pairedName = (state.settings && state.settings.bleDeviceName) || '';
   prefillSetup(state.settings);
   if (state.configured) {
     render(state.snapshot);

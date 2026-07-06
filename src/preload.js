@@ -17,4 +17,13 @@ contextBridge.exposeInMainWorld('timeflip', {
   testConnection: (token) => ipcRenderer.invoke('settings:test', { token }),
   saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
+  // device pairing
+  listDevices: () => ipcRenderer.invoke('ble:list-devices'),
+  chooseDevice: (deviceId) => ipcRenderer.invoke('ble:choose-device', { deviceId }),
+  cancelPairing: () => ipcRenderer.invoke('ble:cancel-pairing'),
+  forgetDevice: () => ipcRenderer.invoke('ble:forget-device'),
+  onDevices: (cb) => ipcRenderer.on('ble-devices', (_e, list) => cb(list)),
+  onPaired: (cb) => ipcRenderer.on('ble-paired', (_e, d) => cb(d)),
+  onWrongDevice: (cb) => ipcRenderer.on('ble-wrong-device', (_e, d) => cb(d)),
 });

@@ -35,22 +35,43 @@ window.startBle = async function startBle(config) {
   stopping = false;
   try {
     status('scanning');
-    // Scan for ALL devices and let the main process pick by name. We cannot
-    // filter on our service UUID here because the TimeFlip2 does not advertise
-    // that service in its broadcast packet (it's only visible after connecting),
-    // so a service filter would never surface the device. The service is still
-    // accessible after connecting because it's listed in optionalServices.
-    device = await navigator.bluetooth.requestDevice({
-      acceptAllDevices: true,
-      optionalServices: [cfg.uuids.service, DEVICE_INFO_SERVICE],
-    });
+    device = await pickDevice();
+    if (!device) return; // pairing cancelled / nothing selected
     device.addEventListener('gattserverdisconnected', onDisconnected);
     await connectGatt();
   } catch (err) {
+    if (err && err.name === 'NotFoundError') {
+      // User cancelled the picker, or no device was chosen. Stay idle.
+      status('idle');
+      return;
+    }
     fail(`requestDevice/connect failed: ${err.message}`);
     scheduleReconnect();
   }
 };
+
+/**
+ * Get the target device. If we already know the exact paired device, reconnect
+ * to it silently via getDevices() (no chooser, no name dependence). Otherwise
+ * scan for all devices; the main process picks by id/name, or forwards the list
+ * to the setup screen for the user to choose (pairing).
+ */
+async function pickDevice() {
+  const wanted = cfg.match && cfg.match.peripheralId;
+  if (wanted && navigator.bluetooth.getDevices) {
+    try {
+      const known = await navigator.bluetooth.getDevices();
+      const found = known.find((d) => d.id === wanted);
+      if (found) return found;
+    } catch {
+      /* getDevices unsupported/empty — fall back to a scan */
+    }
+  }
+  return navigator.bluetooth.requestDevice({
+    acceptAllDevices: true,
+    optionalServices: [cfg.uuids.service, DEVICE_INFO_SERVICE],
+  });
+}
 
 window.stopBle = function stopBle() {
   stopping = true;
@@ -67,7 +88,22 @@ async function connectGatt() {
   if (!device) return;
   status('connecting');
   const server = await device.gatt.connect();
-  const service = await server.getPrimaryService(cfg.uuids.service);
+
+  // Verify this is actually a TimeFlip by the presence of its proprietary
+  // service — the one reliable, name-independent signal. If it's missing, this
+  // is the wrong device; don't loop trying to talk to it.
+  let service;
+  try {
+    service = await server.getPrimaryService(cfg.uuids.service);
+  } catch {
+    send('ble:wrong-device', { deviceName: device.name || null, deviceId: device.id });
+    try {
+      device.gatt.disconnect();
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
 
   chars = {};
   for (const uuid of [cfg.uuids.password, cfg.uuids.facet, cfg.uuids.history, cfg.uuids.command, cfg.uuids.commandResult]) {
@@ -102,7 +138,7 @@ async function connectGatt() {
   const firmware = await readFirmware(server);
 
   status('ready');
-  send('ble:ready', { firmware, deviceName: device.name || null, facet });
+  send('ble:ready', { firmware, deviceName: device.name || null, deviceId: device.id, facet });
 }
 
 async function readFirmware(server) {
