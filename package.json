@@ -1,7 +1,7 @@
 {
   "name": "wxw-time-tracker",
   "productName": "WxW Time Tracker",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Desktop app that reads a TimeFlip2 over BLE and logs time to the WxW Delivery Airtable base",
   "main": "src/main/main.js",
   "author": "What by When",
@@ -24,6 +24,7 @@
   "build": {
     "appId": "com.whatbywhen.wxw-time-tracker",
     "productName": "WxW Time Tracker",
+    "afterPack": "tools/afterPack.js",
     "files": [
       "src/**/*",
       "!**/*.md"
