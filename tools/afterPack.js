@@ -18,6 +18,14 @@ const path = require('path');
 exports.default = async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return;
 
+  // For universal builds, electron-builder packs x64 and arm64 into separate
+  // "-temp" dirs and then merges them with @electron/universal, which requires
+  // the non-binary files (including code signatures) to be byte-identical. So we
+  // must NOT sign the per-arch temps — that makes the signatures differ and the
+  // merge fails. Sign only the final merged app (dist/mac-universal, or a plain
+  // per-arch output when not building universal).
+  if (context.appOutDir.endsWith('-temp')) return;
+
   const appName = context.packager.appInfo.productFilename;
   const appPath = path.join(context.appOutDir, `${appName}.app`);
 
