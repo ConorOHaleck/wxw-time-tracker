@@ -6,7 +6,7 @@ const path = require('path');
 const log = require('./util/logger');
 const settingsStore = require('./settings');
 const { buildConfig } = require('./config');
-const { TABLES, FIELDS, DEVICE_ID_FIELD_NAME } = require('./defaults');
+const { TABLES, FIELDS } = require('./defaults');
 const { Store } = require('./store');
 const { AirtableClient } = require('./airtable/client');
 const { FaceMapper } = require('./airtable/mapper');
@@ -347,12 +347,10 @@ ipcMain.handle('settings:test', async (_e, { token }) => {
     const at = new AirtableClient({ token, baseId: require('./defaults').BASE_ID });
     const records = await at.listRecords(TABLES.timeflip, { maxRecords: 100 });
     const devices = records.map((r) => {
-      const deviceId = r.fields[FIELDS.timeflip.deviceId] || '';
       const users = r.fields[FIELDS.timeflip.airtableUserFromAssignee];
-      let who = 'Unassigned';
+      let who = 'Unassigned TimeFlip';
       if (Array.isArray(users) && users.length) who = users[0].name || users[0].email || who;
-      const label = `${who}${deviceId ? `  ·  ${deviceId}` : '  ·  (no Device ID set)'}`;
-      return { recordId: r.id, label, deviceId };
+      return { recordId: r.id, label: who };
     });
     return { ok: true, devices };
   } catch (err) {

@@ -7,7 +7,7 @@ const log = require('../util/logger');
  * into a ready-to-write Hours record payload.
  *
  * Resolves:
- *   - the TimeFlip record for this install (by record id or Device ID value)
+ *   - the TimeFlip record for this install (by the record chosen in setup)
  *   - the assignee's Airtable user (for the Hours "Name" collaborator field)
  *   - each TimeFlip Face -> { adventureId, adventureName, billableRoleId, hourType, status }
  */
@@ -47,22 +47,11 @@ class FaceMapper {
   }
 
   async _loadTimeflipRecord() {
-    const { timeflipRecordId, deviceIdValue } = this.cfg.device;
-    if (timeflipRecordId) {
-      return this.at.getRecord(this.tables.timeflip, timeflipRecordId);
+    const { timeflipRecordId } = this.cfg.device;
+    if (!timeflipRecordId) {
+      throw new Error('mapper: no TimeFlip device selected. Open setup and choose your device.');
     }
-    // Find by the Device ID single-line-text field.
-    const safe = String(deviceIdValue).replace(/"/g, '\\"');
-    const records = await this.at.listRecords(this.tables.timeflip, {
-      filterByFormula: `{${'Device ID'}} = "${safe}"`,
-      maxRecords: 1,
-    });
-    if (!records.length) {
-      throw new Error(
-        `mapper: no TimeFlip record with Device ID = "${deviceIdValue}". Add one or set device.timeflipRecordId.`
-      );
-    }
-    return records[0];
+    return this.at.getRecord(this.tables.timeflip, timeflipRecordId);
   }
 
   async _loadFaces(faceRecordIds) {

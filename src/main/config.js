@@ -30,7 +30,6 @@ function buildConfig(settings) {
     },
     device: {
       timeflipRecordId: settings.timeflipRecordId,
-      deviceIdValue: '',
       // peripheralId (the exact paired device) takes precedence over the name
       // prefix. Once a device is paired/learned, connection no longer depends on
       // the advertised name at all.

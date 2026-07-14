@@ -19,7 +19,6 @@ const TABLES = {
 
 const FIELDS = {
   timeflip: {
-    deviceId: 'fldlbRDoXJAzhJ0ML',
     currentFace: 'fldwteQGbq6dpvWVi',
     faces: 'fldo9LOadiUJYhdaA',
     airtableUserFromAssignee: 'fldbkpJV5rBUcEVyj',
@@ -58,9 +57,6 @@ const FIELDS = {
   },
 };
 
-// Human-friendly label for the field used to list/choose a device in setup.
-const DEVICE_ID_FIELD_NAME = 'Device ID';
-
 const TRACKING_DEFAULTS = {
   pauseFaces: [],
   minSessionSeconds: 30,
@@ -68,4 +64,4 @@ const TRACKING_DEFAULTS = {
   historyDurationLittleEndian: true,
 };
 
-module.exports = { BASE_ID, TABLES, FIELDS, DEVICE_ID_FIELD_NAME, TRACKING_DEFAULTS };
+module.exports = { BASE_ID, TABLES, FIELDS, TRACKING_DEFAULTS };
