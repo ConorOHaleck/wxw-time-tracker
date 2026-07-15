@@ -274,6 +274,8 @@ class SyncEngine extends EventEmitter {
       hourType: map ? map.hourType : null,
       lastEventNumber: this.store.lastEventNumber,
       assigneeUserId: this.mapper.assigneeUserId,
+      // Set when the picked device belongs to someone else (time still logs as you).
+      ownerWarning: this.mapper.ownerWarning(),
       faceCount: this.mapper.faceMap.size,
       hoursTable: this.hoursTable,
       ...extra,

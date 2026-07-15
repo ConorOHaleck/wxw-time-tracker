@@ -19,29 +19,50 @@ class FaceMapper {
     this.tables = cfg.airtable.tables;
 
     this.timeflipRecordId = null;
-    this.assigneeUserId = null;
+    this.assigneeUserId = null; // who the device is registered to
+    this.assigneeName = null;
+    this.tokenUserId = null; // who is actually running the app
+    this.hoursUserId = null; // who we log time as
     this.faceMap = new Map(); // faceNumber -> mapping
   }
 
   /** Load everything. Call on startup and whenever the mapping might have changed. */
   async load() {
+    // Identify the person running the app from their own token. Time is logged
+    // as them, never as whoever the device happens to be registered to — that
+    // makes misattribution impossible when a die is shared or mis-registered.
+    try {
+      const me = await this.at.whoami();
+      this.tokenUserId = (me && me.id) || null;
+    } catch (err) {
+      log.warn('mapper: whoami failed, falling back to the device assignee:', err.message);
+    }
+
     const tf = await this._loadTimeflipRecord();
     this.timeflipRecordId = tf.id;
 
     const userLookup = tf.fields[this.f.timeflip.airtableUserFromAssignee];
     this.assigneeUserId = this._firstUserId(userLookup);
-    if (!this.assigneeUserId) {
+    this.assigneeName = this._firstUserName(userLookup);
+    this.hoursUserId = this.tokenUserId || this.assigneeUserId;
+    if (!this.hoursUserId) {
       log.warn(
-        'mapper: no Airtable user resolved from Assignee; Hours "Name" will be left blank. ' +
-          'Set an Assignee with a linked Airtable User on the TimeFlip record.'
+        'mapper: no Airtable user resolved from the token or the Assignee; Hours "Name" will be left blank.'
+      );
+    }
+    if (this.deviceOwnerMismatch()) {
+      log.warn(
+        `mapper: this TimeFlip is registered to ${this.assigneeName || 'someone else'}, ` +
+          'but time will be logged under the token owner.'
       );
     }
 
     const faceLinks = tf.fields[this.f.timeflip.faces] || [];
     await this._loadFaces(faceLinks);
     log.info(
-      `mapper: loaded TimeFlip ${this.timeflipRecordId} with ${this.faceMap.size} faces, ` +
-        `assignee user ${this.assigneeUserId || '(none)'}`
+      `mapper: loaded TimeFlip ${this.timeflipRecordId} with ${this.faceMap.size} faces; ` +
+        `logging time as ${this.hoursUserId || '(nobody)'} ` +
+        `(token=${this.tokenUserId || 'unknown'}, device assignee=${this.assigneeUserId || 'none'})`
     );
     return this;
   }
@@ -132,12 +153,31 @@ class FaceMapper {
     return this.trackableReason(facet) === null;
   }
 
+  /** True when the picked device is registered to someone other than the token owner. */
+  deviceOwnerMismatch() {
+    return !!(this.tokenUserId && this.assigneeUserId && this.tokenUserId !== this.assigneeUserId);
+  }
+
+  /**
+   * Warning for the UI when you're using someone else's device. Time is still
+   * logged as you, but each face's Billable Role comes from their setup.
+   */
+  ownerWarning() {
+    if (!this.deviceOwnerMismatch()) return null;
+    return (
+      `This TimeFlip is registered to ${this.assigneeName || 'someone else'}. ` +
+      'Your time is logged under your own name, but each face’s Billable Role and ' +
+      'Adventure come from their setup — pick your own device if you have one.'
+    );
+  }
+
   /** Build the Hours create payload for a session on `facet` starting at startMs. */
   buildHoursFields(facet, startMs) {
     const m = this.forFacet(facet);
     const hf = this.f.hours;
     const fields = {};
-    if (this.assigneeUserId) fields[hf.name] = { id: this.assigneeUserId };
+    // Always the person running the app (their token), not the device's assignee.
+    if (this.hoursUserId) fields[hf.name] = { id: this.hoursUserId };
     if (m && m.billableRoleId) fields[hf.billableRole] = [m.billableRoleId];
     if (m && m.adventureId) fields[hf.adventure] = [m.adventureId];
     if (m && m.hourType) fields[hf.type] = m.hourType; // Hour Type names match Hours "Type" choices
@@ -166,6 +206,12 @@ class FaceMapper {
     }
     if (value && typeof value === 'object') return value.id || null;
     return null;
+  }
+
+  _firstUserName(value) {
+    const v = Array.isArray(value) ? value[0] : value;
+    if (!v || typeof v !== 'object') return null;
+    return v.name || v.email || null;
   }
 }
 

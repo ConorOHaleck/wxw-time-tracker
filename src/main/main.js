@@ -345,14 +345,29 @@ ipcMain.handle('settings:test', async (_e, { token }) => {
   if (!token) return { ok: false, error: 'Enter your Airtable token first.' };
   try {
     const at = new AirtableClient({ token, baseId: require('./defaults').BASE_ID });
+
+    // Who owns this token? Used to flag which device is actually yours.
+    let meId = null;
+    try {
+      const me = await at.whoami();
+      meId = (me && me.id) || null;
+    } catch (err) {
+      log.warn('app: whoami failed during connection test:', err.message);
+    }
+
     const records = await at.listRecords(TABLES.timeflip, { maxRecords: 100 });
     const devices = records.map((r) => {
       const users = r.fields[FIELDS.timeflip.airtableUserFromAssignee];
       let who = 'Unassigned TimeFlip';
-      if (Array.isArray(users) && users.length) who = users[0].name || users[0].email || who;
-      return { recordId: r.id, label: who };
+      let assigneeUserId = null;
+      if (Array.isArray(users) && users.length) {
+        who = users[0].name || users[0].email || who;
+        assigneeUserId = users[0].id || null;
+      }
+      const isYou = !!(meId && assigneeUserId && assigneeUserId === meId);
+      return { recordId: r.id, label: isYou ? `${who}  (you)` : who, isYou };
     });
-    return { ok: true, devices };
+    return { ok: true, devices, identified: !!meId };
   } catch (err) {
     const msg = /401|AUTHENTICATION/i.test(err.message)
       ? 'That token was rejected. Check it has read+write access to the WxW Delivery base.'

@@ -39,6 +39,20 @@ class AirtableClient {
     return text ? JSON.parse(text) : {};
   }
 
+  /**
+   * Who does this token belong to? Returns { id, email?, scopes }.
+   * Not base-scoped, so it can't go through _request(). `id` (usr…) is always
+   * present; `email` only if the token has the user.email:read scope.
+   */
+  async whoami() {
+    const res = await fetch(`${API_ROOT}/meta/whoami`, {
+      headers: { Authorization: `Bearer ${this.token}` },
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Airtable whoami -> ${res.status}: ${text}`);
+    return text ? JSON.parse(text) : {};
+  }
+
   /** List records with an optional filterByFormula and field projection. */
   async listRecords(tableId, { filterByFormula, fields, maxRecords } = {}) {
     const params = new URLSearchParams();

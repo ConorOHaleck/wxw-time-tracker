@@ -36,7 +36,11 @@
         <select id="deviceSelect" disabled>
           <option value="">Test your connection first…</option>
         </select>
-        <div class="hint">Pick the device assigned to you. This decides whose hours get logged.</div>
+        <div class="hint">
+          Pick your own device — it's marked <b>(you)</b>. Your time is always logged under
+          your own name; this choice decides which Adventure each face maps to.
+        </div>
+        <div id="deviceWarn" class="warn hidden"></div>
       </div>
 
       <div class="step">
@@ -69,6 +73,8 @@
 
     <!-- ============ STATUS VIEW ============ -->
     <section id="statusView" class="hidden">
+      <div id="ownerWarn" class="warn hidden"></div>
+
       <div class="card">
         <div class="face" id="faceBig">–</div>
         <div class="face-label" id="faceLabel">Waiting for device…</div>

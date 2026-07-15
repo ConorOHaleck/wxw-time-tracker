@@ -63,6 +63,15 @@ function render(s) {
     $('faceLabel').textContent = s2.connected ? 'No face detected' : 'Looking for your TimeFlip…';
   }
 
+  // Using someone else's device — time still logs as you, but faces are theirs.
+  const ownerWarn = $('ownerWarn');
+  if (s2.ownerWarning) {
+    ownerWarn.textContent = '⚠ ' + s2.ownerWarning;
+    ownerWarn.classList.remove('hidden');
+  } else {
+    ownerWarn.classList.add('hidden');
+  }
+
   $('trackState').textContent = s2.tracking ? 'Yes' : 'No';
   $('sessionStart').textContent = fmtTime(s2.sessionStartMs);
   $('faceCount').textContent = s2.faceCount != null ? s2.faceCount : '—';
@@ -121,6 +130,7 @@ async function testConnection() {
     }
     const sel = $('deviceSelect');
     sel.innerHTML = '';
+    window.__deviceIsYou = {};
     if (!res.devices.length) {
       sel.innerHTML = '<option value="">No TimeFlip records found in the base</option>';
     } else {
@@ -130,13 +140,17 @@ async function testConnection() {
         opt.value = d.recordId;
         opt.textContent = d.label;
         sel.appendChild(opt);
+        window.__deviceIsYou[d.recordId] = !!d.isYou;
       }
-      // Pre-select the previously chosen device if present.
+      // Prefer the previously chosen device; otherwise default to your own.
+      const yours = res.devices.find((d) => d.isYou);
       if (window.__savedRecordId) sel.value = window.__savedRecordId;
+      else if (yours) sel.value = yours.recordId;
     }
     sel.disabled = false;
     $('deviceStep').setAttribute('aria-disabled', 'false');
     setMsg($('testMsg'), `Connected ✓  Found ${res.devices.length} device(s).`, 'ok');
+    refreshDeviceWarning();
     refreshSaveEnabled();
   } catch (err) {
     setMsg($('testMsg'), err.message, 'error');
@@ -149,6 +163,22 @@ async function testConnection() {
 function refreshSaveEnabled() {
   const ready = $('token').value.trim() && $('deviceSelect').value;
   $('saveBtn').disabled = !ready;
+}
+
+/** Warn when the chosen device is registered to someone other than you. */
+function refreshDeviceWarning() {
+  const el = $('deviceWarn');
+  const picked = $('deviceSelect').value;
+  const map = window.__deviceIsYou || {};
+  if (picked && map[picked] === false) {
+    el.innerHTML =
+      "⚠ That TimeFlip isn't registered to you. Your time will still be logged under " +
+      "<b>your own name</b>, but each face's Adventure and Billable Role come from that " +
+      'person\'s setup, so they may be wrong.';
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
 }
 
 async function saveSettings() {
@@ -264,7 +294,10 @@ window.timeflip.onShowSetup(() => show('setup'));
 $('settingsBtn').addEventListener('click', () => show('setup'));
 $('testBtn').addEventListener('click', testConnection);
 $('token').addEventListener('input', refreshSaveEnabled);
-$('deviceSelect').addEventListener('change', refreshSaveEnabled);
+$('deviceSelect').addEventListener('change', () => {
+  refreshDeviceWarning();
+  refreshSaveEnabled();
+});
 $('saveBtn').addEventListener('click', saveSettings);
 $('tokenHelp').addEventListener('click', (e) => {
   e.preventDefault();
