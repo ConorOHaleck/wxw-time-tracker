@@ -110,17 +110,26 @@ class FaceMapper {
   }
 
   /**
-   * Should a flip to this facet create an Hours record?
-   * Skips configured pause faces, the undefined facet (0), and inactive faces.
+   * Why a flip to this facet won't create an Hours record — or null if it will.
+   * Returned to the UI so a face that silently isn't tracking explains itself.
    */
-  isTrackable(facet) {
-    if (!facet || facet < 1) return false;
-    if (this.cfg.tracking.pauseFaces.includes(facet)) return false;
+  trackableReason(facet) {
+    if (!facet || facet < 1) return 'No face detected yet';
+    if (this.cfg.tracking.pauseFaces.includes(facet)) {
+      return `Face ${facet} is set as a pause face`;
+    }
     const m = this.forFacet(facet);
-    if (!m) return false;
-    if (m.status && String(m.status).toLowerCase() === 'inactive') return false;
-    if (!m.adventureId) return false; // nothing to bill it to
-    return true;
+    if (!m) return `Face ${facet} isn’t set up in TimeFlip Faces`;
+    if (m.status && String(m.status).toLowerCase() === 'inactive') {
+      return `Face ${facet} is marked Inactive in Airtable`;
+    }
+    if (!m.adventureId) return `Face ${facet} has no Adventure assigned in Airtable`;
+    return null;
+  }
+
+  /** Should a flip to this facet create an Hours record? */
+  isTrackable(facet) {
+    return this.trackableReason(facet) === null;
   }
 
   /** Build the Hours create payload for a session on `facet` starting at startMs. */

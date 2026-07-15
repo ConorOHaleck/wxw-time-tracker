@@ -265,6 +265,8 @@ class SyncEngine extends EventEmitter {
       deviceFacet: this.deviceFacet,
       currentFacet: c ? c.facet : 0,
       tracking: !!(c && c.tracked),
+      // Why the face that's up isn't being tracked (null when it is).
+      notTrackingReason: c && !c.tracked ? this.mapper.trackableReason(c.facet) : null,
       openRecordId: c ? c.airtableRecordId : null,
       sessionStartMs: c ? c.startMs : null,
       adventureId: map ? map.adventureId : null,

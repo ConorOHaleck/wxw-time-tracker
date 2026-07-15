@@ -47,15 +47,16 @@ function render(s) {
 
   const faceEl = $('faceBig');
   const face = s2.currentFacet > 0 ? s2.currentFacet : s2.deviceFacet;
-  if (s2.currentFacet > 0) {
-    // A trackable face is up — show the Adventure assigned to it.
+  if (s2.tracking) {
+    // Actually logging time — show the Adventure assigned to this face.
     faceEl.textContent = s2.adventureName || `Face ${s2.currentFacet}`;
     faceEl.className = 'face' + (s2.adventureName ? ' name' : '');
     $('faceLabel').textContent = `Tracking · face ${s2.currentFacet}`;
   } else if (face > 0) {
+    // A face is up but we are NOT logging it — say exactly why.
     faceEl.textContent = `Face ${face}`;
     faceEl.className = 'face idle';
-    $('faceLabel').textContent = 'This face isn’t set to track time';
+    $('faceLabel').textContent = s2.notTrackingReason || 'This face isn’t set to track time';
   } else {
     faceEl.textContent = '–';
     faceEl.className = 'face idle';
