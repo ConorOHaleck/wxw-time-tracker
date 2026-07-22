@@ -9,7 +9,8 @@ const log = require('../util/logger');
  * Resolves:
  *   - the TimeFlip record for this install (by the record chosen in setup)
  *   - the assignee's Airtable user (for the Hours "Name" collaborator field)
- *   - each TimeFlip Face -> { adventureId, adventureName, billableRoleId, hourType, status }
+ *   - each TimeFlip Face -> { adventureId, adventureName, billableRoleId,
+ *     billableRoleName, hourType, status }
  */
 class FaceMapper {
   constructor(airtable, cfg) {
@@ -67,12 +68,37 @@ class FaceMapper {
     return this;
   }
 
+  /**
+   * Find the TimeFlip record whose setup we should use. Normally this is
+   * resolved from the token's own user — the face mapping belongs to the
+   * person, not to the plastic die, so you can pick up any TimeFlip and get
+   * your own faces. A stored record id acts as a manual override.
+   */
   async _loadTimeflipRecord() {
     const { timeflipRecordId } = this.cfg.device;
-    if (!timeflipRecordId) {
-      throw new Error('mapper: no TimeFlip device selected. Open setup and choose your device.');
+    if (timeflipRecordId) {
+      return this.at.getRecord(this.tables.timeflip, timeflipRecordId);
     }
-    return this.at.getRecord(this.tables.timeflip, timeflipRecordId);
+    if (!this.tokenUserId) {
+      throw new Error(
+        "Couldn't identify you from your Airtable token. Open setup and choose a device manually."
+      );
+    }
+    const records = await this.at.listRecords(this.tables.timeflip, { maxRecords: 100 });
+    const uf = this.f.timeflip.airtableUserFromAssignee;
+    const mine = records.filter((r) => this._userIdsOf(r.fields[uf]).includes(this.tokenUserId));
+
+    if (!mine.length) {
+      throw new Error(
+        'No TimeFlip in Airtable is assigned to you. Ask an admin to set you as the Assignee ' +
+          'on a TimeFlip record, or choose a device manually in setup.'
+      );
+    }
+    if (mine.length > 1) {
+      log.warn(`mapper: ${mine.length} TimeFlip records are assigned to you; using the first`);
+    }
+    log.info('mapper: auto-resolved your TimeFlip record', mine[0].id);
+    return mine[0];
   }
 
   async _loadFaces(faceRecordIds) {
@@ -93,36 +119,57 @@ class FaceMapper {
         faceRecordId: rec.id,
         faceNumber: Number(faceNumber),
         adventureId: this._firstLink(rec.fields[ff.adventures]),
-        adventureName: null, // filled in by _resolveAdventureNames
+        adventureName: null, // both filled in by _resolveLinkedNames
         billableRoleId: this._firstLink(rec.fields[ff.billableRole]),
+        billableRoleName: null,
         hourType: rec.fields[ff.hourType] || null,
         status: rec.fields[ff.status] || null,
       });
     }
-    await this._resolveAdventureNames();
+    await this._resolveLinkedNames();
   }
 
   /**
    * Linked-record fields come back from the REST API as bare record ids, so we
-   * fetch each unique linked Adventure once to get its display name (for the UI).
+   * fetch each unique linked Adventure and Billable Role once to get their
+   * display names. The role matters: the same person can have two roles on the
+   * same Adventure, and that's the only thing telling those two faces apart.
    */
-  async _resolveAdventureNames() {
-    const ids = [
-      ...new Set([...this.faceMap.values()].map((m) => m.adventureId).filter(Boolean)),
-    ];
+  async _resolveLinkedNames() {
+    const faces = [...this.faceMap.values()];
     const af = this.f.adventures;
+    const bf = this.f.billableRoles;
+
+    const advNames = await this._fetchNames(
+      [...new Set(faces.map((m) => m.adventureId).filter(Boolean))],
+      this.tables.adventures,
+      [af.projectName, af.project]
+    );
+    const roleNames = await this._fetchNames(
+      [...new Set(faces.map((m) => m.billableRoleId).filter(Boolean))],
+      this.tables.billableRoles,
+      [bf.role, bf.name]
+    );
+
+    for (const m of faces) {
+      m.adventureName = m.adventureId ? advNames.get(m.adventureId) || null : null;
+      m.billableRoleName = m.billableRoleId ? roleNames.get(m.billableRoleId) || null : null;
+    }
+  }
+
+  /** Fetch display names for linked records, using the first non-empty field. */
+  async _fetchNames(ids, tableId, fieldIds) {
     const names = new Map();
     for (const id of ids) {
       try {
-        const rec = await this.at.getRecord(this.tables.adventures, id);
-        names.set(id, rec.fields[af.projectName] || rec.fields[af.project] || null);
+        const rec = await this.at.getRecord(tableId, id);
+        const value = fieldIds.map((f) => rec.fields[f]).find((v) => v);
+        names.set(id, value || null);
       } catch (err) {
-        log.warn('mapper: could not load adventure', id, err.message);
+        log.warn('mapper: could not load linked record', id, 'from', tableId, err.message);
       }
     }
-    for (const m of this.faceMap.values()) {
-      m.adventureName = m.adventureId ? names.get(m.adventureId) || null : null;
-    }
+    return names;
   }
 
   /** Mapping for a facet, or null if that face is not configured. */
@@ -206,6 +253,12 @@ class FaceMapper {
     }
     if (value && typeof value === 'object') return value.id || null;
     return null;
+  }
+
+  /** All Airtable user ids in a collaborator/lookup value. */
+  _userIdsOf(value) {
+    const list = Array.isArray(value) ? value : [value];
+    return list.map((v) => (typeof v === 'string' ? v : v && v.id)).filter(Boolean);
   }
 
   _firstUserName(value) {

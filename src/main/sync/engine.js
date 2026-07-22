@@ -2,6 +2,7 @@
 
 const EventEmitter = require('events');
 const log = require('../util/logger');
+const { TABLES } = require('../defaults');
 
 /**
  * Ties the BLE device, the Airtable mapper, and the local store together.
@@ -255,6 +256,42 @@ class SyncEngine extends EventEmitter {
     }, ms);
   }
 
+  // ---- live re-read of the Airtable face setup ----
+
+  /**
+   * Re-read the TimeFlip record, faces and Adventure names from Airtable —
+   * someone may have changed a face's Adventure, Billable Role, Hour Type or
+   * Status while we're running.
+   *
+   * If the config for the face that's currently up changed materially, the open
+   * Hours entry is closed at "now" and a new one started under the new mapping,
+   * so time before and after the edit is billed correctly. A face that just
+   * became trackable starts tracking; one that no longer is gets closed out.
+   */
+  async refreshMapping() {
+    const facet = this.deviceFacet || (this.current ? this.current.facet : 0);
+    const before = facet ? this._mappingSignature(facet) : null;
+
+    await this.mapper.load();
+
+    const after = facet ? this._mappingSignature(facet) : null;
+    if (facet > 0 && before !== after) {
+      log.info('engine: face', facet, 'config changed on resync — restarting session');
+      await this._closeCurrent(Date.now());
+      await this._beginSession(facet, Date.now());
+    }
+    this._emit();
+    return this.snapshot();
+  }
+
+  /** Compact fingerprint of a face's config, to detect meaningful changes. */
+  _mappingSignature(facet) {
+    const m = this.mapper.forFacet(facet);
+    const trackable = this.mapper.isTrackable(facet);
+    if (!m) return `unmapped:${trackable}`;
+    return [trackable, m.adventureId, m.billableRoleId, m.hourType, m.status].join('|');
+  }
+
   // ---- UI snapshot ----
 
   snapshot(extra = {}) {
@@ -271,6 +308,7 @@ class SyncEngine extends EventEmitter {
       sessionStartMs: c ? c.startMs : null,
       adventureId: map ? map.adventureId : null,
       adventureName: map ? map.adventureName : null,
+      billableRoleName: map ? map.billableRoleName : null,
       hourType: map ? map.hourType : null,
       lastEventNumber: this.store.lastEventNumber,
       assigneeUserId: this.mapper.assigneeUserId,
@@ -278,6 +316,8 @@ class SyncEngine extends EventEmitter {
       ownerWarning: this.mapper.ownerWarning(),
       faceCount: this.mapper.faceMap.size,
       hoursTable: this.hoursTable,
+      // Writing to the practice table — this time never reaches payroll.
+      isTestingTarget: this.hoursTable === TABLES.hoursTesting,
       ...extra,
     };
   }

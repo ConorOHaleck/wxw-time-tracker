@@ -56,9 +56,13 @@ function save(userDataDir, settings) {
   return merged;
 }
 
-/** True once the app has enough to actually run. */
+/**
+ * True once the app has enough to run. Only the token is required — the
+ * TimeFlip record is resolved from the token's own user at load time, and
+ * `timeflipRecordId` is just an optional manual override.
+ */
 function isComplete(settings) {
-  return !!(settings && settings.airtableToken && settings.timeflipRecordId);
+  return !!(settings && settings.airtableToken);
 }
 
 module.exports = { DEFAULTS, load, save, isComplete, filePath };

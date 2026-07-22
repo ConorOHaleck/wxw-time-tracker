@@ -295,6 +295,18 @@ ipcMain.handle('reconcile-now', async () => {
   return engine ? engine.snapshot() : lastSnapshot;
 });
 
+// Re-read the face setup from Airtable without restarting the app.
+ipcMain.handle('resync-faces', async () => {
+  if (!engine) return { ok: false, error: 'Not connected yet — finish setup first.' };
+  try {
+    const snapshot = await engine.refreshMapping();
+    return { ok: true, snapshot };
+  } catch (err) {
+    log.error('app: resync faces failed', err.message);
+    return { ok: false, error: `Couldn't reload from Airtable: ${err.message}` };
+  }
+});
+
 // ---- IPC: device pairing ----
 
 // Enter manual "choose device" mode and return what we've discovered so far.
@@ -346,11 +358,13 @@ ipcMain.handle('settings:test', async (_e, { token }) => {
   try {
     const at = new AirtableClient({ token, baseId: require('./defaults').BASE_ID });
 
-    // Who owns this token? Used to flag which device is actually yours.
+    // Who owns this token? Used to resolve your device automatically.
     let meId = null;
+    let meEmail = null;
     try {
       const me = await at.whoami();
       meId = (me && me.id) || null;
+      meEmail = (me && me.email) || null;
     } catch (err) {
       log.warn('app: whoami failed during connection test:', err.message);
     }
@@ -365,9 +379,19 @@ ipcMain.handle('settings:test', async (_e, { token }) => {
         assigneeUserId = users[0].id || null;
       }
       const isYou = !!(meId && assigneeUserId && assigneeUserId === meId);
-      return { recordId: r.id, label: isYou ? `${who}  (you)` : who, isYou };
+      return { recordId: r.id, who, label: isYou ? `${who}  (you)` : who, isYou };
     });
-    return { ok: true, devices, identified: !!meId };
+
+    // Which record is "yours"? Exactly one match means no picking required.
+    const mine = devices.filter((d) => d.isYou);
+    return {
+      ok: true,
+      devices,
+      identified: !!meId,
+      meName: (mine[0] && mine[0].who) || meEmail || null,
+      matchCount: mine.length,
+      autoRecordId: mine.length === 1 ? mine[0].recordId : null,
+    };
   } catch (err) {
     const msg = /401|AUTHENTICATION/i.test(err.message)
       ? 'That token was rejected. Check it has read+write access to the WxW Delivery base.'

@@ -31,6 +31,18 @@ header {
 
 header h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; }
 
+/* Primary action in the header slot (setup screen). */
+.header-btn {
+  flex: none;
+  width: auto;
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.header-btn:disabled { opacity: 0.4; cursor: default; }
+
 .back-btn {
   flex: none;
   width: auto;
@@ -74,6 +86,20 @@ input[type="text"], input[type="password"], input[type="number"], select {
   font-size: 14px;
 }
 select:disabled { opacity: 0.6; }
+/* Who the token belongs to / which TimeFlip setup will be used. */
+.identity {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  background: #0f1115;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  margin-bottom: 10px;
+}
+.identity.ok { color: #b6f0c2; border-color: var(--green); background: rgba(52, 199, 89, 0.1); }
+.identity.warnish { color: #ffd9a0; border-color: var(--amber); background: rgba(255, 159, 10, 0.1); }
+
 .hint { font-size: 11.5px; color: var(--muted); margin: 6px 0 10px; line-height: 1.5; }
 .hint a { color: var(--accent); cursor: pointer; }
 
@@ -86,6 +112,13 @@ select:disabled { opacity: 0.6; }
   border: 1px solid var(--amber);
   color: #ffd9a0;
   border-radius: 8px; padding: 9px 11px; font-size: 12px; margin-top: 6px;
+}
+/* Persistent, always-on notice — quieter so it informs without nagging. */
+.warn.small {
+  font-size: 11.5px;
+  padding: 7px 10px;
+  margin: 0 0 12px;
+  line-height: 1.45;
 }
 
 .advanced { margin-bottom: 14px; font-size: 13px; }
@@ -154,17 +187,6 @@ select:disabled { opacity: 0.6; }
 .picker-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
 .picker-actions .secondary { flex: none; width: auto; padding: 8px 16px; }
 
-.dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: var(--muted);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.04);
-}
-.dot.online { background: var(--green); }
-.dot.offline { background: var(--red); }
-.dot.connecting { background: var(--amber); }
-
 .card {
   background: var(--card);
   border: 1px solid var(--line);
@@ -188,6 +210,19 @@ select:disabled { opacity: 0.6; }
   word-break: break-word;
   padding: 0 4px;
 }
+/* Billable role for the active session, shown under the Adventure name. */
+.role-chip {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(79, 140, 255, 0.14);
+  border: 1px solid rgba(79, 140, 255, 0.45);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .face-label { margin-top: 8px; color: var(--muted); font-size: 13px; }
 
 .grid {

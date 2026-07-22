@@ -13,6 +13,7 @@ const TABLES = {
   timeflip: 'tblJR92EMiEcdKcpN',
   faces: 'tblVakgKaD6vfNj8l',
   adventures: 'tblCSJIhA8QpXVfsl',
+  billableRoles: 'tblDkZbJpIQiphlF8',
   hoursTesting: 'tbll6GJlXkJyjhPom',
   hoursProduction: 'tblOtz0vowbHJnuAG',
 };
@@ -36,6 +37,13 @@ const FIELDS = {
     // "Project Name"; fall back to the "Project" primary formula (id + name).
     projectName: 'fldqG21IJZ9BXDIVw',
     project: 'fldpeovVxIjgfrxJq',
+  },
+  billableRoles: {
+    // Prefer the bare role ("Senior Manager"); fall back to the primary formula
+    // ("Kyle Dingman | Senior Manager"). The same person can have several roles
+    // on one Adventure, so this is what tells two such faces apart.
+    role: 'fldfQTrMQlm8rc0QR',
+    name: 'fldx1S3OVDB2Uq8P3',
   },
   // The two Hours tables have different field IDs; the active set is chosen by
   // the "use production" toggle.

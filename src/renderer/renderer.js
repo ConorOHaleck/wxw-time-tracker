@@ -14,7 +14,9 @@ const TABLE_LABELS = {
 function show(view) {
   $('setupView').classList.toggle('hidden', view !== 'setup');
   $('statusView').classList.toggle('hidden', view !== 'status');
+  // The header's action slot: Back on the tracking screen, Save on setup.
   $('settingsBtn').classList.toggle('hidden', view !== 'status');
+  $('saveBtn').classList.toggle('hidden', view !== 'setup');
 }
 
 // ---------- status view ----------
@@ -29,9 +31,6 @@ function render(s) {
   if (!snapshot) return;
   const s2 = snapshot;
 
-  const dot = $('dot');
-  const connecting = ['connecting', 'scanning', 'authenticating'].includes(s2.bleState);
-  dot.className = 'dot ' + (s2.connected ? 'online' : connecting ? 'connecting' : 'offline');
   $('conn').textContent = s2.connected ? 'Connected' : s2.bleState || 'disconnected';
 
   $('deviceName').textContent = s2.connected
@@ -63,6 +62,9 @@ function render(s) {
     $('faceLabel').textContent = s2.connected ? 'No face detected' : 'Looking for your TimeFlip…';
   }
 
+  // Practice mode — make it obvious this time won't reach payroll.
+  $('testingNotice').classList.toggle('hidden', !s2.isTestingTarget);
+
   // Using someone else's device — time still logs as you, but faces are theirs.
   const ownerWarn = $('ownerWarn');
   if (s2.ownerWarning) {
@@ -71,6 +73,17 @@ function render(s) {
   } else {
     ownerWarn.classList.add('hidden');
   }
+
+  // Billable role — the same person can hold several roles on one Adventure,
+  // so this is what distinguishes two faces pointing at the same project.
+  const roleChip = $('roleChip');
+  if (s2.tracking && s2.billableRoleName) {
+    roleChip.textContent = s2.billableRoleName;
+    roleChip.classList.remove('hidden');
+  } else {
+    roleChip.classList.add('hidden');
+  }
+  $('billableRole').textContent = s2.billableRoleName || '—';
 
   $('trackState').textContent = s2.tracking ? 'Yes' : 'No';
   $('sessionStart').textContent = fmtTime(s2.sessionStartMs);
@@ -102,6 +115,8 @@ function showFatal(msg) {
 function prefillSetup(settings) {
   if (!settings) return;
   $('token').value = settings.airtableToken || '';
+  // A stored record id means the user overrode the automatic match.
+  $('manualDevice').checked = !!settings.timeflipRecordId;
   $('bleName').value = settings.bleNamePrefix || 'TimeFlip';
   $('minSession').value = settings.minSessionSeconds ?? 30;
   $('pauseFaces').value = (settings.pauseFaces || []).join(', ');
@@ -129,28 +144,25 @@ async function testConnection() {
       return;
     }
     const sel = $('deviceSelect');
-    sel.innerHTML = '';
+    sel.innerHTML = '<option value="">Choose a device…</option>';
     window.__deviceIsYou = {};
-    if (!res.devices.length) {
-      sel.innerHTML = '<option value="">No TimeFlip records found in the base</option>';
-    } else {
-      sel.innerHTML = '<option value="">Choose your device…</option>';
-      for (const d of res.devices) {
-        const opt = document.createElement('option');
-        opt.value = d.recordId;
-        opt.textContent = d.label;
-        sel.appendChild(opt);
-        window.__deviceIsYou[d.recordId] = !!d.isYou;
-      }
-      // Prefer the previously chosen device; otherwise default to your own.
-      const yours = res.devices.find((d) => d.isYou);
-      if (window.__savedRecordId) sel.value = window.__savedRecordId;
-      else if (yours) sel.value = yours.recordId;
+    for (const d of res.devices) {
+      const opt = document.createElement('option');
+      opt.value = d.recordId;
+      opt.textContent = d.label;
+      sel.appendChild(opt);
+      window.__deviceIsYou[d.recordId] = !!d.isYou;
     }
-    sel.disabled = false;
+    if (window.__savedRecordId) sel.value = window.__savedRecordId;
+    else if (res.autoRecordId) sel.value = res.autoRecordId;
+
+    window.__identified = !!res.identified;
+    window.__matchCount = res.matchCount;
+    window.__meName = res.meName;
+
     $('deviceStep').setAttribute('aria-disabled', 'false');
-    setMsg($('testMsg'), `Connected ✓  Found ${res.devices.length} device(s).`, 'ok');
-    refreshDeviceWarning();
+    setMsg($('testMsg'), `Connected ✓  Found ${res.devices.length} TimeFlip record(s).`, 'ok');
+    updateDeviceStep();
     refreshSaveEnabled();
   } catch (err) {
     setMsg($('testMsg'), err.message, 'error');
@@ -160,15 +172,81 @@ async function testConnection() {
   }
 }
 
-function refreshSaveEnabled() {
-  const ready = $('token').value.trim() && $('deviceSelect').value;
-  $('saveBtn').disabled = !ready;
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
 }
 
-/** Warn when the chosen device is registered to someone other than you. */
+/**
+ * Decide whether we can use the TimeFlip assigned to this token's user, or
+ * whether the person has to pick one. The picker only appears when automatic
+ * resolution can't give a single answer (or the user overrides it).
+ */
+function updateDeviceStep() {
+  const line = $('identityLine');
+  const wrap = $('devicePickWrap');
+  const count = window.__matchCount;
+  const me = window.__meName;
+
+  if (count === undefined) {
+    // Not tested yet this session.
+    line.textContent = 'Test your connection first…';
+    line.className = 'identity';
+    wrap.classList.toggle('hidden', !$('manualDevice').checked);
+    refreshDeviceWarning();
+    return;
+  }
+
+  // Force manual selection when the token can't be matched to exactly one device.
+  if (!window.__identified || count === 0 || count > 1) $('manualDevice').checked = true;
+  const manual = $('manualDevice').checked;
+
+  if (!window.__identified) {
+    line.textContent = "Couldn't identify you from this token — choose a setup below.";
+    line.className = 'identity warnish';
+  } else if (count === 0) {
+    line.innerHTML = me
+      ? `Signed in as <b>${escapeHtml(me)}</b>, but no TimeFlip in Airtable is assigned to you — choose one below.`
+      : 'No TimeFlip in Airtable is assigned to you — choose one below.';
+    line.className = 'identity warnish';
+  } else if (count > 1) {
+    line.innerHTML = `<b>${escapeHtml(me)}</b> has several TimeFlip records — pick the one to use.`;
+    line.className = 'identity warnish';
+  } else if (manual) {
+    line.innerHTML = `Signed in as <b>${escapeHtml(me)}</b> — choosing a setup manually.`;
+    line.className = 'identity';
+  } else {
+    line.innerHTML =
+      `✓ Signed in as <b>${escapeHtml(me)}</b> — using the TimeFlip setup assigned to you. ` +
+      'Pick up any die and your own faces apply.';
+    line.className = 'identity ok';
+  }
+
+  wrap.classList.toggle('hidden', !manual);
+  refreshDeviceWarning();
+}
+
+function refreshSaveEnabled() {
+  const hasToken = !!$('token').value.trim();
+  if (!hasToken) {
+    $('saveBtn').disabled = true;
+    return;
+  }
+  // Not tested yet — allow saving; the device resolves (or errors clearly) on start.
+  if (window.__matchCount === undefined) {
+    $('saveBtn').disabled = false;
+    return;
+  }
+  const auto = window.__identified && window.__matchCount === 1 && !$('manualDevice').checked;
+  $('saveBtn').disabled = !(auto || !!$('deviceSelect').value);
+}
+
+/** Warn when a manually chosen device is registered to someone other than you. */
 function refreshDeviceWarning() {
   const el = $('deviceWarn');
-  const picked = $('deviceSelect').value;
+  const picked = $('manualDevice').checked ? $('deviceSelect').value : '';
   const map = window.__deviceIsYou || {};
   if (picked && map[picked] === false) {
     el.innerHTML =
@@ -189,7 +267,9 @@ async function saveSettings() {
     .filter((n) => Number.isInteger(n));
   const settings = {
     airtableToken: $('token').value.trim(),
-    timeflipRecordId: $('deviceSelect').value,
+    // Empty means "resolve my TimeFlip from my token each time"; a value is a
+    // deliberate manual override.
+    timeflipRecordId: $('manualDevice').checked ? $('deviceSelect').value : '',
     useProduction,
     bleNamePrefix: $('bleName').value.trim() || 'TimeFlip',
     minSessionSeconds: parseInt($('minSession').value, 10) || 30,
@@ -298,6 +378,10 @@ $('deviceSelect').addEventListener('change', () => {
   refreshDeviceWarning();
   refreshSaveEnabled();
 });
+$('manualDevice').addEventListener('change', () => {
+  updateDeviceStep();
+  refreshSaveEnabled();
+});
 $('saveBtn').addEventListener('click', saveSettings);
 $('tokenHelp').addEventListener('click', (e) => {
   e.preventDefault();
@@ -317,7 +401,30 @@ $('reconcileBtn').addEventListener('click', async () => {
     render(await window.timeflip.reconcileNow());
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Sync past time now';
+    btn.textContent = 'Sync past time';
+  }
+});
+
+// Re-read the face setup from Airtable (after editing faces mid-session).
+$('resyncBtn').addEventListener('click', async () => {
+  const btn = $('resyncBtn');
+  btn.disabled = true;
+  btn.textContent = 'Reloading…';
+  try {
+    const res = await window.timeflip.resyncFaces();
+    if (res && res.ok) {
+      render(res.snapshot);
+      const n = res.snapshot && res.snapshot.faceCount;
+      setMsg($('actionMsg'), `Faces reloaded from Airtable${n != null ? ` (${n} faces)` : ''}.`, 'ok');
+    } else {
+      setMsg($('actionMsg'), (res && res.error) || 'Reload failed.', 'error');
+    }
+  } catch (err) {
+    setMsg($('actionMsg'), err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Resync faces';
+    setTimeout(() => $('actionMsg').classList.add('hidden'), 6000);
   }
 });
 
@@ -326,6 +433,8 @@ $('reconcileBtn').addEventListener('click', async () => {
   window.__savedRecordId = state.settings && state.settings.timeflipRecordId;
   pairedName = (state.settings && state.settings.bleDeviceName) || '';
   prefillSetup(state.settings);
+  updateDeviceStep();
+  refreshSaveEnabled();
   if (state.configured) {
     render(state.snapshot);
     show('status');

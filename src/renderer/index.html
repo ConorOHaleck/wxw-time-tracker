@@ -8,8 +8,9 @@
   </head>
   <body>
     <header>
-      <div id="dot" class="dot offline"></div>
       <h1>WxW Time Tracker</h1>
+      <!-- One action slot, shared by both screens: Save on setup, Back on tracking. -->
+      <button id="saveBtn" class="header-btn hidden" disabled>Save &amp; start tracking</button>
       <button id="settingsBtn" class="back-btn hidden" title="Back to setup">← Back</button>
     </header>
 
@@ -18,6 +19,8 @@
     <!-- ============ SETUP VIEW ============ -->
     <section id="setupView" class="hidden">
       <p class="lead">Let's get you tracking. This takes about a minute.</p>
+      <!-- Save feedback lives near the header button that triggers it. -->
+      <div id="saveMsg" class="msg hidden"></div>
 
       <div class="step">
         <div class="step-head"><span class="num">1</span> Connect to Airtable</div>
@@ -32,13 +35,16 @@
       </div>
 
       <div class="step" id="deviceStep" aria-disabled="true">
-        <div class="step-head"><span class="num">2</span> Which TimeFlip is yours?</div>
-        <select id="deviceSelect" disabled>
-          <option value="">Test your connection first…</option>
-        </select>
-        <div class="hint">
-          Pick your own device — it's marked <b>(you)</b>. Your time is always logged under
-          your own name; this choice decides which Adventure each face maps to.
+        <div class="step-head"><span class="num">2</span> Your TimeFlip setup</div>
+        <div id="identityLine" class="identity">Test your connection first…</div>
+        <div id="devicePickWrap" class="hidden">
+          <select id="deviceSelect">
+            <option value="">Choose a device…</option>
+          </select>
+          <div class="hint">
+            Your time is always logged under your own name; this only decides which
+            Adventure each face maps to.
+          </div>
         </div>
         <div id="deviceWarn" class="warn hidden"></div>
       </div>
@@ -58,6 +64,10 @@
 
       <details class="advanced">
         <summary>Advanced options</summary>
+        <label class="radio" for="manualDevice">
+          <input type="checkbox" id="manualDevice" />
+          <span>Choose the TimeFlip setup manually (instead of using the one assigned to me)</span>
+        </label>
         <label for="bleName">Bluetooth device name to look for</label>
         <input id="bleName" type="text" placeholder="TimeFlip" />
         <div class="hint">Leave as <b>TimeFlip</b> unless a Bluetooth scanner shows your die broadcasting a different name — then enter that name (or the start of it) here.</div>
@@ -67,16 +77,18 @@
         <input id="pauseFaces" type="text" placeholder="e.g. 12" />
       </details>
 
-      <button id="saveBtn" disabled>Save &amp; start tracking</button>
-      <div id="saveMsg" class="msg hidden"></div>
     </section>
 
     <!-- ============ STATUS VIEW ============ -->
     <section id="statusView" class="hidden">
       <div id="ownerWarn" class="warn hidden"></div>
+      <div id="testingNotice" class="warn small hidden">
+        ⚠ Saving to <b>Hours Testing</b> — this time is for practice only and will <b>not</b> be added to payroll.
+      </div>
 
       <div class="card">
         <div class="face" id="faceBig">–</div>
+        <div class="role-chip hidden" id="roleChip"></div>
         <div class="face-label" id="faceLabel">Waiting for device…</div>
         <div class="elapsed-big" id="elapsed"></div>
       </div>
@@ -84,7 +96,8 @@
       <div class="grid">
         <div class="kv"><span>Connection</span><b id="conn">—</b></div>
         <div class="kv"><span>Device</span><b id="deviceName">—</b></div>
-        <div class="kv"><span>Tracking now</span><b id="trackState">—</b></div>
+        <div class="kv"><span>Currently clocking</span><b id="trackState">—</b></div>
+        <div class="kv"><span>Billable role</span><b id="billableRole">—</b></div>
         <div class="kv"><span>Started</span><b id="sessionStart">—</b></div>
         <div class="kv"><span>Faces set up</span><b id="faceCount">—</b></div>
         <div class="kv"><span>Saving time to</span><b id="hoursTable">—</b></div>
@@ -107,8 +120,10 @@
       </div>
 
       <section class="actions">
-        <button id="reconcileBtn" class="secondary">Sync past time now</button>
+        <button id="resyncBtn" class="secondary" title="Re-read this device's faces from Airtable — use after changing a face's Adventure, Billable Role, Hour Type or Status.">Resync faces</button>
+        <button id="reconcileBtn" class="secondary" title="Import any time the die recorded while the app was closed or out of range.">Sync past time</button>
       </section>
+      <div id="actionMsg" class="msg hidden"></div>
     </section>
 
     <script src="renderer.js"></script>
