@@ -38,8 +38,10 @@
       "target": [
         { "target": "dmg", "arch": "universal" }
       ],
-      "identity": null,
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "tools/entitlements.mac.plist",
+      "entitlementsInherit": "tools/entitlements.mac.plist",
       "extendInfo": {
         "NSBluetoothAlwaysUsageDescription": "WxW Time Tracker connects to your TimeFlip die over Bluetooth to log your time.",
         "NSBluetoothPeripheralUsageDescription": "WxW Time Tracker connects to your TimeFlip die over Bluetooth to log your time.",

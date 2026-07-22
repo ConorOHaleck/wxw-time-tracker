@@ -27,6 +27,10 @@ jobs:
           - os: windows-latest
             platform: win
     runs-on: ${{ matrix.os }}
+    env:
+      # Job-level so the signing step's `if:` can test whether it's configured
+      # (the secrets context isn't available in step conditions).
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -40,12 +44,55 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Code signing is optional: with no secrets set, this builds exactly as
+      # before (Windows unsigned, macOS ad-hoc signed so it launches). Add the
+      # secrets below and the same workflow signs and notarizes automatically.
       - name: Build installer (${{ matrix.platform }})
+        shell: bash
         env:
-          # We don't code-sign; keep electron-builder from probing for a cert.
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run dist:${{ matrix.platform }}
+          # macOS Developer ID certificate (base64 .p12) + its password.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # Only probe for a local cert when one was actually provided.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.CSC_LINK != '' && 'true' || 'false' }}
+          # Apple notarization credentials.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -e
+          npm run icon
+          if [ "${{ matrix.platform }}" = "win" ]; then
+            npx electron-builder --win
+          elif [ -n "$CSC_LINK" ] && [ -n "$APPLE_ID" ]; then
+            echo "Apple credentials present — signing and notarizing."
+            npx electron-builder --mac --config.mac.notarize=true
+          elif [ -n "$CSC_LINK" ]; then
+            echo "Developer ID cert present but no notarization credentials — signing only."
+            npx electron-builder --mac
+          else
+            echo "No Apple credentials — unsigned build (ad-hoc signed so it still launches)."
+            npx electron-builder --mac --config.mac.identity=null
+          fi
+
+      # Windows signing runs after packaging and before upload, so the artifact
+      # and the release asset are the signed installer.
+      - name: Sign Windows installer (Azure Trusted Signing)
+        if: matrix.platform == 'win' && env.AZURE_CLIENT_ID != ''
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.AZURE_CODE_SIGNING_NAME }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE_NAME }}
+          files-folder: ${{ github.workspace }}/dist
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
 
       - name: Upload installers as build artifacts
         uses: actions/upload-artifact@v4

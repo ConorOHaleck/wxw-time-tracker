@@ -18,6 +18,14 @@ const path = require('path');
 exports.default = async function afterPack(context) {
   if (context.electronPlatformName !== 'darwin') return;
 
+  // If a real Developer ID certificate is configured, electron-builder signs the
+  // app itself (and notarizes it). Ad-hoc signing here would REPLACE that real
+  // signature and silently break notarization — so stand down.
+  if (process.env.CSC_LINK || process.env.CSC_NAME) {
+    console.log('afterPack: Developer ID signing configured — skipping ad-hoc signature');
+    return;
+  }
+
   // For universal builds, electron-builder packs x64 and arm64 into separate
   // "-temp" dirs and then merges them with @electron/universal, which requires
   // the non-binary files (including code signatures) to be byte-identical. So we

@@ -14,7 +14,7 @@ const TABLE_LABELS = {
 function show(view) {
   $('setupView').classList.toggle('hidden', view !== 'setup');
   $('statusView').classList.toggle('hidden', view !== 'status');
-  // The header's action slot: Back on the tracking screen, Save on setup.
+  // The header's action slot: Settings on the tracking screen, Save on setup.
   $('settingsBtn').classList.toggle('hidden', view !== 'status');
   $('saveBtn').classList.toggle('hidden', view !== 'setup');
 }

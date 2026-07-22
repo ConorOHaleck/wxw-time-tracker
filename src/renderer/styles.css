@@ -43,7 +43,8 @@ header h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; }
 }
 .header-btn:disabled { opacity: 0.4; cursor: default; }
 
-.back-btn {
+/* Secondary action in the header slot (tracking screen). */
+.settings-btn {
   flex: none;
   width: auto;
   background: transparent;
@@ -55,7 +56,7 @@ header h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; }
   border-radius: 8px;
   cursor: pointer;
 }
-.back-btn:hover { color: var(--text); border-color: var(--accent); }
+.settings-btn:hover { color: var(--text); border-color: var(--accent); }
 
 /* ---- setup view ---- */
 .lead { color: var(--muted); font-size: 13px; margin: 0 0 16px; }

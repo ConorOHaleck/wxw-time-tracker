@@ -120,6 +120,45 @@ test build. CI needs no secrets: it uses the automatic `GITHUB_TOKEN`, and the a
 code-signed. (The `winCodeSign` symlink problem below does **not** occur on the CI Windows
 runner, which has the required privilege.)
 
+### Code signing (optional — pre-wired, off until secrets exist)
+
+Out of the box the installers are **unsigned**: Windows shows a SmartScreen prompt
+and macOS needs a one-time right-click → Open. The build is already wired to sign
+and notarize the moment you add the secrets below — no code changes needed. With
+no secrets set, nothing changes.
+
+**macOS** — needs an [Apple Developer Program](https://developer.apple.com/programs/)
+membership ($99/yr) and a *Developer ID Application* certificate. Add these repo
+secrets (Settings → Secrets and variables → Actions):
+
+| Secret | What it is |
+| --- | --- |
+| `CSC_LINK` | The Developer ID `.p12`, base64-encoded (`base64 -i cert.p12`) |
+| `CSC_KEY_PASSWORD` | Password for that `.p12` |
+| `APPLE_ID` | Apple ID email for notarization |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-specific password (appleid.apple.com → Sign-In and Security) |
+| `APPLE_TEAM_ID` | 10-character Team ID |
+
+With `CSC_LINK` + `APPLE_ID` present the workflow signs **and** notarizes; with only
+`CSC_LINK` it signs without notarizing; with neither it ad-hoc signs as today.
+
+**Windows** — the workflow uses [Azure Trusted Signing](https://learn.microsoft.com/azure/trusted-signing/)
+(~$10/month, no hardware token, works in CI). Add:
+
+`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_ENDPOINT`,
+`AZURE_CODE_SIGNING_NAME`, `AZURE_CERT_PROFILE_NAME`.
+
+> ⚠️ Azure Trusted Signing's public-trust identity validation has required the
+> organization to have **3+ years of verifiable history** — confirm eligibility
+> before subscribing. An EV certificate (with a cloud HSM such as DigiCert
+> KeyLocker or SSL.com eSigner, so it works in CI) is the fallback. A plain OV
+> certificate will *not* clear SmartScreen immediately.
+
+> **Note:** `tools/afterPack.js` ad-hoc signs the macOS app so it launches on Apple
+> Silicon when unsigned. It deliberately stands down when `CSC_LINK`/`CSC_NAME` is
+> set — otherwise it would overwrite the real Developer ID signature and break
+> notarization.
+
 ### Building an installer locally (optional)
 
 ```bash

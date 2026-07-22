@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Entitlements for Developer ID signing + notarization (hardened runtime).
+
+  The three cs.* entries are required by Electron/V8: the hardened runtime blocks
+  JIT and writable-executable memory by default, which would crash the app on
+  launch. Bluetooth is needed for the Web Bluetooth transport that talks to the
+  TimeFlip. Not sandboxed — this is a Developer ID build, not Mac App Store.
+-->
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <key>com.apple.security.device.bluetooth</key>
+    <true/>
+  </dict>
+</plist>
