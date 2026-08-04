@@ -67,6 +67,10 @@ jobs:
           npm run icon
           node tools/embed-token.js
           if [ "${{ matrix.platform }}" = "win" ]; then
+            # CSC_LINK is the macOS cert; Windows signs via Azure. An empty
+            # CSC_LINK makes electron-builder try to load it as a Windows cert
+            # and fail, so make sure it's unset on this path.
+            unset CSC_LINK CSC_KEY_PASSWORD
             npx electron-builder --win
           elif [ -n "$CSC_LINK" ] && [ -n "$APPLE_ID" ]; then
             echo "Apple credentials present — signing and notarizing."
