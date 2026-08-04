@@ -14,6 +14,7 @@ const TABLES = {
   faces: 'tblVakgKaD6vfNj8l',
   adventures: 'tblCSJIhA8QpXVfsl',
   billableRoles: 'tblDkZbJpIQiphlF8',
+  people: 'tblDM0kyR5FtWtu1W',
   hoursTesting: 'tbll6GJlXkJyjhPom',
   hoursProduction: 'tblOtz0vowbHJnuAG',
 };
@@ -23,6 +24,14 @@ const FIELDS = {
     currentFace: 'fldwteQGbq6dpvWVi',
     faces: 'fldo9LOadiUJYhdaA',
     airtableUserFromAssignee: 'fldbkpJV5rBUcEVyj',
+  },
+  people: {
+    // Used only to build the "select your name" list. We read the display name,
+    // the linked Airtable User (whose id time is logged under), and Status.
+    // We deliberately never touch the sensitive PII fields in this table.
+    name: 'fld6iNYarSDxlaN83',
+    airtableUser: 'fldNsvKz30pzeUtds',
+    status: 'fldMbtMgFEIztIU1D',
   },
   faces: {
     faceNumber: 'fldfI8hgi4cLeVh1e',

@@ -112,10 +112,13 @@ function showFatal(msg) {
 
 // ---------- setup view ----------
 
+let people = []; // [{userId, name}] for the "your name" dropdown
+
 function prefillSetup(settings) {
   if (!settings) return;
   $('token').value = settings.airtableToken || '';
-  // A stored record id means the user overrode the automatic match.
+  window.__savedUserId = settings.selectedUserId || '';
+  window.__savedRecordId = settings.timeflipRecordId || '';
   $('manualDevice').checked = !!settings.timeflipRecordId;
   $('bleName').value = settings.bleNamePrefix || 'TimeFlip';
   $('minSession').value = settings.minSessionSeconds ?? 30;
@@ -123,6 +126,7 @@ function prefillSetup(settings) {
   const target = settings.useProduction ? 'production' : 'testing';
   document.querySelector(`input[name="target"][value="${target}"]`).checked = true;
   $('prodWarn').classList.toggle('hidden', target !== 'production');
+  updateOverrideVisibility();
 }
 
 function setMsg(el, text, kind) {
@@ -131,128 +135,80 @@ function setMsg(el, text, kind) {
   el.classList.remove('hidden');
 }
 
-async function testConnection() {
-  const token = $('token').value.trim();
-  const btn = $('testBtn');
-  btn.disabled = true;
-  btn.textContent = 'Testing…';
-  setMsg($('testMsg'), 'Checking your token…', '');
+/** Load the "select your name" list (and the override device list) via the shared token. */
+async function loadPeople() {
+  const btn = $('connectBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Connecting…';
+  }
+  const sel = $('personSelect');
+  sel.disabled = true;
+  sel.innerHTML = '<option value="">Loading names…</option>';
   try {
-    const res = await window.timeflip.testConnection(token);
+    const res = await window.timeflip.loadPeople($('token').value.trim());
     if (!res.ok) {
+      sel.innerHTML = '<option value="">Couldn’t load names</option>';
       setMsg($('testMsg'), res.error, 'error');
       return;
     }
-    const sel = $('deviceSelect');
-    sel.innerHTML = '<option value="">Choose a device…</option>';
-    window.__deviceIsYou = {};
-    for (const d of res.devices) {
-      const opt = document.createElement('option');
-      opt.value = d.recordId;
-      opt.textContent = d.label;
-      sel.appendChild(opt);
-      window.__deviceIsYou[d.recordId] = !!d.isYou;
+    people = res.people || [];
+    sel.innerHTML = '<option value="">Select your name…</option>';
+    for (const p of people) {
+      const o = document.createElement('option');
+      o.value = p.userId;
+      o.textContent = p.name;
+      sel.appendChild(o);
     }
-    if (window.__savedRecordId) sel.value = window.__savedRecordId;
-    else if (res.autoRecordId) sel.value = res.autoRecordId;
+    if (window.__savedUserId) sel.value = window.__savedUserId;
+    sel.disabled = false;
 
-    window.__identified = !!res.identified;
-    window.__matchCount = res.matchCount;
-    window.__meName = res.meName;
+    // Override device list (Advanced → "use a specific TimeFlip setup").
+    const dsel = $('deviceSelect');
+    dsel.innerHTML = '<option value="">Choose a TimeFlip setup…</option>';
+    window.__deviceAssignee = {};
+    for (const d of res.devices || []) {
+      const o = document.createElement('option');
+      o.value = d.recordId;
+      o.textContent = d.label;
+      dsel.appendChild(o);
+      window.__deviceAssignee[d.recordId] = d.assigneeUserId || null;
+    }
+    if (window.__savedRecordId) dsel.value = window.__savedRecordId;
 
-    $('deviceStep').setAttribute('aria-disabled', 'false');
-    setMsg($('testMsg'), `Connected ✓  Found ${res.devices.length} TimeFlip record(s).`, 'ok');
-    updateDeviceStep();
+    $('testMsg').classList.add('hidden');
+    refreshDeviceWarning();
     refreshSaveEnabled();
   } catch (err) {
     setMsg($('testMsg'), err.message, 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Test connection';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Connect';
+    }
   }
 }
 
-function escapeHtml(s) {
-  return String(s == null ? '' : s).replace(
-    /[&<>"']/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
-  );
-}
-
-/**
- * Decide whether we can use the TimeFlip assigned to this token's user, or
- * whether the person has to pick one. The picker only appears when automatic
- * resolution can't give a single answer (or the user overrides it).
- */
-function updateDeviceStep() {
-  const line = $('identityLine');
-  const wrap = $('devicePickWrap');
-  const count = window.__matchCount;
-  const me = window.__meName;
-
-  if (count === undefined) {
-    // Not tested yet this session.
-    line.textContent = 'Test your connection first…';
-    line.className = 'identity';
-    wrap.classList.toggle('hidden', !$('manualDevice').checked);
-    refreshDeviceWarning();
-    return;
-  }
-
-  // Force manual selection when the token can't be matched to exactly one device.
-  if (!window.__identified || count === 0 || count > 1) $('manualDevice').checked = true;
-  const manual = $('manualDevice').checked;
-
-  if (!window.__identified) {
-    line.textContent = "Couldn't identify you from this token — choose a setup below.";
-    line.className = 'identity warnish';
-  } else if (count === 0) {
-    line.innerHTML = me
-      ? `Signed in as <b>${escapeHtml(me)}</b>, but no TimeFlip in Airtable is assigned to you — choose one below.`
-      : 'No TimeFlip in Airtable is assigned to you — choose one below.';
-    line.className = 'identity warnish';
-  } else if (count > 1) {
-    line.innerHTML = `<b>${escapeHtml(me)}</b> has several TimeFlip records — pick the one to use.`;
-    line.className = 'identity warnish';
-  } else if (manual) {
-    line.innerHTML = `Signed in as <b>${escapeHtml(me)}</b> — choosing a setup manually.`;
-    line.className = 'identity';
-  } else {
-    line.innerHTML =
-      `✓ Signed in as <b>${escapeHtml(me)}</b> — using the TimeFlip setup assigned to you. ` +
-      'Pick up any die and your own faces apply.';
-    line.className = 'identity ok';
-  }
-
-  wrap.classList.toggle('hidden', !manual);
+function updateOverrideVisibility() {
+  $('deviceSelect').classList.toggle('hidden', !$('manualDevice').checked);
   refreshDeviceWarning();
 }
 
 function refreshSaveEnabled() {
-  const hasToken = !!$('token').value.trim();
-  if (!hasToken) {
-    $('saveBtn').disabled = true;
-    return;
-  }
-  // Not tested yet — allow saving; the device resolves (or errors clearly) on start.
-  if (window.__matchCount === undefined) {
-    $('saveBtn').disabled = false;
-    return;
-  }
-  const auto = window.__identified && window.__matchCount === 1 && !$('manualDevice').checked;
-  $('saveBtn').disabled = !(auto || !!$('deviceSelect').value);
+  // The only thing required to start is having picked a name.
+  $('saveBtn').disabled = !$('personSelect').value;
 }
 
-/** Warn when a manually chosen device is registered to someone other than you. */
+/** Warn when the manual override points at a setup belonging to someone else. */
 function refreshDeviceWarning() {
   const el = $('deviceWarn');
-  const picked = $('manualDevice').checked ? $('deviceSelect').value : '';
-  const map = window.__deviceIsYou || {};
-  if (picked && map[picked] === false) {
+  const rec = $('manualDevice').checked ? $('deviceSelect').value : '';
+  const assignee = (window.__deviceAssignee || {})[rec];
+  const me = $('personSelect').value;
+  if (rec && assignee && me && assignee !== me) {
     el.innerHTML =
-      "⚠ That TimeFlip isn't registered to you. Your time will still be logged under " +
-      "<b>your own name</b>, but each face's Adventure and Billable Role come from that " +
-      'person\'s setup, so they may be wrong.';
+      "⚠ That setup belongs to someone else. Your time still logs under <b>your own name</b>, " +
+      "but its faces' Adventures and Billable Roles are theirs.";
     el.classList.remove('hidden');
   } else {
     el.classList.add('hidden');
@@ -265,10 +221,12 @@ async function saveSettings() {
     .value.split(',')
     .map((s) => parseInt(s.trim(), 10))
     .filter((n) => Number.isInteger(n));
+  const nameSel = $('personSelect');
   const settings = {
+    selectedUserId: nameSel.value,
+    selectedPersonName: nameSel.selectedIndex > 0 ? nameSel.options[nameSel.selectedIndex].text : '',
     airtableToken: $('token').value.trim(),
-    // Empty means "resolve my TimeFlip from my token each time"; a value is a
-    // deliberate manual override.
+    // A value = deliberately use a specific setup; empty = the one assigned to me.
     timeflipRecordId: $('manualDevice').checked ? $('deviceSelect').value : '',
     useProduction,
     bleNamePrefix: $('bleName').value.trim() || 'TimeFlip',
@@ -372,16 +330,13 @@ window.timeflip.onFatal(showFatal);
 window.timeflip.onShowSetup(() => show('setup'));
 
 $('settingsBtn').addEventListener('click', () => show('setup'));
-$('testBtn').addEventListener('click', testConnection);
-$('token').addEventListener('input', refreshSaveEnabled);
-$('deviceSelect').addEventListener('change', () => {
+$('connectBtn').addEventListener('click', loadPeople);
+$('personSelect').addEventListener('change', () => {
   refreshDeviceWarning();
   refreshSaveEnabled();
 });
-$('manualDevice').addEventListener('change', () => {
-  updateDeviceStep();
-  refreshSaveEnabled();
-});
+$('deviceSelect').addEventListener('change', refreshDeviceWarning);
+$('manualDevice').addEventListener('change', updateOverrideVisibility);
 $('saveBtn').addEventListener('click', saveSettings);
 $('tokenHelp').addEventListener('click', (e) => {
   e.preventDefault();
@@ -430,10 +385,16 @@ $('resyncBtn').addEventListener('click', async () => {
 
 (async function boot() {
   const state = await window.timeflip.getState();
-  window.__savedRecordId = state.settings && state.settings.timeflipRecordId;
   pairedName = (state.settings && state.settings.bleDeviceName) || '';
   prefillSetup(state.settings);
-  updateDeviceStep();
+
+  // Hide the token field entirely when a token is baked into the build.
+  $('tokenRow').classList.toggle('hidden', !!state.hasEmbeddedToken);
+
+  // Load the name list right away if we already have a usable token.
+  const haveToken = state.hasEmbeddedToken || (state.settings && state.settings.airtableToken);
+  if (haveToken) loadPeople();
+
   refreshSaveEnabled();
   if (state.configured) {
     render(state.snapshot);

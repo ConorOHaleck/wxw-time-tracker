@@ -1,7 +1,7 @@
 {
   "name": "wxw-time-tracker",
   "productName": "WxW Time Tracker",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Desktop app that reads a TimeFlip2 over BLE and logs time to the WxW Delivery Airtable base",
   "main": "src/main/main.js",
   "author": "What by When",
@@ -12,9 +12,10 @@
     "dev": "electron . --dev",
     "test": "node test/protocol.test.js",
     "icon": "node tools/make-icon.js",
-    "dist": "npm run icon && electron-builder",
-    "dist:win": "npm run icon && electron-builder --win",
-    "dist:mac": "npm run icon && electron-builder --mac"
+    "prebuild": "node tools/make-icon.js && node tools/embed-token.js",
+    "dist": "npm run prebuild && electron-builder",
+    "dist:win": "npm run prebuild && electron-builder --win",
+    "dist:mac": "npm run prebuild && electron-builder --mac"
   },
   "dependencies": {},
   "devDependencies": {

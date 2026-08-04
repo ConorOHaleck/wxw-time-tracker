@@ -9,17 +9,24 @@ const { BASE_ID, TABLES, FIELDS } = require('./defaults');
  * The production-vs-testing toggle automatically swaps both the target table
  * and its field-id set — the user never touches a field id.
  */
-function buildConfig(settings) {
+function buildConfig(settings, token) {
   const useProd = !!settings.useProduction;
   return {
+    // The person this session logs time for — the selected name, not the token
+    // owner. The shared token belongs to one admin; identity comes from here.
+    identity: {
+      userId: settings.selectedUserId || '',
+      name: settings.selectedPersonName || '',
+    },
     airtable: {
-      token: settings.airtableToken,
+      token: token || settings.airtableToken,
       baseId: BASE_ID,
       tables: {
         timeflip: TABLES.timeflip,
         faces: TABLES.faces,
         adventures: TABLES.adventures,
         billableRoles: TABLES.billableRoles,
+        people: TABLES.people,
         hoursTarget: useProd ? TABLES.hoursProduction : TABLES.hoursTesting,
       },
       fields: {
@@ -27,6 +34,7 @@ function buildConfig(settings) {
         faces: FIELDS.faces,
         adventures: FIELDS.adventures,
         billableRoles: FIELDS.billableRoles,
+        people: FIELDS.people,
         hours: useProd ? FIELDS.hoursProduction : FIELDS.hoursTesting,
       },
     },

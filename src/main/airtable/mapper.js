@@ -22,39 +22,31 @@ class FaceMapper {
     this.timeflipRecordId = null;
     this.assigneeUserId = null; // who the device is registered to
     this.assigneeName = null;
-    this.tokenUserId = null; // who is actually running the app
+    this.selectedUserId = (cfg.identity && cfg.identity.userId) || null; // who WE are
+    this.selectedName = (cfg.identity && cfg.identity.name) || null;
     this.hoursUserId = null; // who we log time as
     this.faceMap = new Map(); // faceNumber -> mapping
   }
 
   /** Load everything. Call on startup and whenever the mapping might have changed. */
   async load() {
-    // Identify the person running the app from their own token. Time is logged
-    // as them, never as whoever the device happens to be registered to — that
-    // makes misattribution impossible when a die is shared or mis-registered.
-    try {
-      const me = await this.at.whoami();
-      this.tokenUserId = (me && me.id) || null;
-    } catch (err) {
-      log.warn('mapper: whoami failed, falling back to the device assignee:', err.message);
-    }
-
+    // Identity is the selected person (their Airtable user id), NOT the shared
+    // token's owner. Time is always logged as the selected person, so the shared
+    // sign-in can never misattribute hours.
     const tf = await this._loadTimeflipRecord();
     this.timeflipRecordId = tf.id;
 
     const userLookup = tf.fields[this.f.timeflip.airtableUserFromAssignee];
     this.assigneeUserId = this._firstUserId(userLookup);
     this.assigneeName = this._firstUserName(userLookup);
-    this.hoursUserId = this.tokenUserId || this.assigneeUserId;
+    this.hoursUserId = this.selectedUserId || this.assigneeUserId;
     if (!this.hoursUserId) {
-      log.warn(
-        'mapper: no Airtable user resolved from the token or the Assignee; Hours "Name" will be left blank.'
-      );
+      log.warn('mapper: no user selected; Hours "Name" will be left blank.');
     }
     if (this.deviceOwnerMismatch()) {
       log.warn(
-        `mapper: this TimeFlip is registered to ${this.assigneeName || 'someone else'}, ` +
-          'but time will be logged under the token owner.'
+        `mapper: this TimeFlip setup belongs to ${this.assigneeName || 'someone else'}, ` +
+          `but time is logged as ${this.selectedName || this.selectedUserId}.`
       );
     }
 
@@ -62,42 +54,42 @@ class FaceMapper {
     await this._loadFaces(faceLinks);
     log.info(
       `mapper: loaded TimeFlip ${this.timeflipRecordId} with ${this.faceMap.size} faces; ` +
-        `logging time as ${this.hoursUserId || '(nobody)'} ` +
-        `(token=${this.tokenUserId || 'unknown'}, device assignee=${this.assigneeUserId || 'none'})`
+        `logging time as ${this.selectedName || this.hoursUserId || '(nobody)'} ` +
+        `(selected=${this.selectedUserId || 'none'}, device assignee=${this.assigneeUserId || 'none'})`
     );
     return this;
   }
 
   /**
-   * Find the TimeFlip record whose setup we should use. Normally this is
-   * resolved from the token's own user — the face mapping belongs to the
-   * person, not to the plastic die, so you can pick up any TimeFlip and get
-   * your own faces. A stored record id acts as a manual override.
+   * Find the TimeFlip record whose setup we should use. Resolved from the
+   * selected person — the face mapping belongs to the person, not the plastic
+   * die, so they can pick up any TimeFlip and get their own faces. A stored
+   * record id acts as a manual override.
    */
   async _loadTimeflipRecord() {
     const { timeflipRecordId } = this.cfg.device;
     if (timeflipRecordId) {
       return this.at.getRecord(this.tables.timeflip, timeflipRecordId);
     }
-    if (!this.tokenUserId) {
+    if (!this.selectedUserId) {
       throw new Error(
-        "Couldn't identify you from your Airtable token. Open setup and choose a device manually."
+        'No name selected. Open Settings and choose your name from the list.'
       );
     }
     const records = await this.at.listRecords(this.tables.timeflip, { maxRecords: 100 });
     const uf = this.f.timeflip.airtableUserFromAssignee;
-    const mine = records.filter((r) => this._userIdsOf(r.fields[uf]).includes(this.tokenUserId));
+    const mine = records.filter((r) => this._userIdsOf(r.fields[uf]).includes(this.selectedUserId));
 
     if (!mine.length) {
       throw new Error(
-        'No TimeFlip in Airtable is assigned to you. Ask an admin to set you as the Assignee ' +
-          'on a TimeFlip record, or choose a device manually in setup.'
+        `No TimeFlip in Airtable is assigned to ${this.selectedName || 'you'}. Ask an admin to ` +
+          'set you as the Assignee on a TimeFlip record, or pick a setup manually in Settings.'
       );
     }
     if (mine.length > 1) {
-      log.warn(`mapper: ${mine.length} TimeFlip records are assigned to you; using the first`);
+      log.warn(`mapper: ${mine.length} TimeFlip records assigned to ${this.selectedName}; using the first`);
     }
-    log.info('mapper: auto-resolved your TimeFlip record', mine[0].id);
+    log.info('mapper: resolved TimeFlip record for', this.selectedName || this.selectedUserId, mine[0].id);
     return mine[0];
   }
 
@@ -200,21 +192,26 @@ class FaceMapper {
     return this.trackableReason(facet) === null;
   }
 
-  /** True when the picked device is registered to someone other than the token owner. */
+  /** True when the TimeFlip setup in use belongs to someone other than the selected person. */
   deviceOwnerMismatch() {
-    return !!(this.tokenUserId && this.assigneeUserId && this.tokenUserId !== this.assigneeUserId);
+    return !!(
+      this.selectedUserId &&
+      this.assigneeUserId &&
+      this.selectedUserId !== this.assigneeUserId
+    );
   }
 
   /**
-   * Warning for the UI when you're using someone else's device. Time is still
-   * logged as you, but each face's Billable Role comes from their setup.
+   * Warning for the UI when the resolved setup belongs to someone else (only via
+   * a manual override). Time is still logged as the selected person, but each
+   * face's Adventure and Billable Role come from the other person's setup.
    */
   ownerWarning() {
     if (!this.deviceOwnerMismatch()) return null;
     return (
-      `This TimeFlip is registered to ${this.assigneeName || 'someone else'}. ` +
-      'Your time is logged under your own name, but each face’s Billable Role and ' +
-      'Adventure come from their setup — pick your own device if you have one.'
+      `This TimeFlip setup belongs to ${this.assigneeName || 'someone else'}. ` +
+      `Time is logged as ${this.selectedName || 'you'}, but each face’s Adventure and ` +
+      'Billable Role come from their setup.'
     );
   }
 
@@ -223,7 +220,7 @@ class FaceMapper {
     const m = this.forFacet(facet);
     const hf = this.f.hours;
     const fields = {};
-    // Always the person running the app (their token), not the device's assignee.
+    // Always the selected person, never the shared token's owner or the device assignee.
     if (this.hoursUserId) fields[hf.name] = { id: this.hoursUserId };
     if (m && m.billableRoleId) fields[hf.billableRole] = [m.billableRoleId];
     if (m && m.adventureId) fields[hf.adventure] = [m.adventureId];

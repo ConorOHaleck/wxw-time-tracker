@@ -23,34 +23,29 @@
       <div id="saveMsg" class="msg hidden"></div>
 
       <div class="step">
-        <div class="step-head"><span class="num">1</span> Connect to Airtable</div>
-        <label for="token">Airtable access token</label>
-        <input id="token" type="password" placeholder="patXXXXXXXXXXXXXX..." autocomplete="off" spellcheck="false" />
-        <div class="hint">
-          Paste a personal access token with read &amp; write access to the WxW Delivery base.
-          <a href="#" id="tokenHelp">Where do I get one?</a>
-        </div>
-        <button id="testBtn" class="secondary">Test connection</button>
-        <div id="testMsg" class="msg hidden"></div>
-      </div>
+        <div class="step-head"><span class="num">1</span> Who are you?</div>
 
-      <div class="step" id="deviceStep" aria-disabled="true">
-        <div class="step-head"><span class="num">2</span> Your TimeFlip setup</div>
-        <div id="identityLine" class="identity">Test your connection first…</div>
-        <div id="devicePickWrap" class="hidden">
-          <select id="deviceSelect">
-            <option value="">Choose a device…</option>
-          </select>
+        <!-- Only shown when a shared token isn't baked into the build (admin setup). -->
+        <div id="tokenRow" class="hidden">
+          <label for="token">Shared Airtable token</label>
+          <input id="token" type="password" placeholder="patXXXXXXXXXXXXXX..." autocomplete="off" spellcheck="false" />
           <div class="hint">
-            Your time is always logged under your own name; this only decides which
-            Adventure each face maps to.
+            Set up once for the team by an admin. <a href="#" id="tokenHelp">Where do I get one?</a>
           </div>
+          <button id="connectBtn" class="secondary">Connect</button>
+          <div id="testMsg" class="msg hidden"></div>
         </div>
+
+        <label for="personSelect">Your name</label>
+        <select id="personSelect" disabled>
+          <option value="">Loading names…</option>
+        </select>
+        <div class="hint">Pick your name — your time is logged under it, and your own TimeFlip faces apply.</div>
         <div id="deviceWarn" class="warn hidden"></div>
       </div>
 
       <div class="step">
-        <div class="step-head"><span class="num">3</span> Where should time go?</div>
+        <div class="step-head"><span class="num">2</span> Where should time go?</div>
         <label class="radio">
           <input type="radio" name="target" value="testing" checked />
           <span><b>Hours Testing</b> — practice safely (recommended while trying it out)</span>
@@ -66,8 +61,11 @@
         <summary>Advanced options</summary>
         <label class="radio" for="manualDevice">
           <input type="checkbox" id="manualDevice" />
-          <span>Choose the TimeFlip setup manually (instead of using the one assigned to me)</span>
+          <span>Use a specific TimeFlip setup (instead of the one assigned to my name)</span>
         </label>
+        <select id="deviceSelect" class="hidden">
+          <option value="">Choose a TimeFlip setup…</option>
+        </select>
         <label for="bleName">Bluetooth device name to look for</label>
         <input id="bleName" type="text" placeholder="TimeFlip" />
         <div class="hint">Leave as <b>TimeFlip</b> unless a Bluetooth scanner shows your die broadcasting a different name — then enter that name (or the start of it) here.</div>

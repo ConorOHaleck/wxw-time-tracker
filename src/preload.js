@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld('timeflip', {
 
   // setup
   getSettings: () => ipcRenderer.invoke('settings:get'),
-  testConnection: (token) => ipcRenderer.invoke('settings:test', { token }),
+  loadPeople: (token) => ipcRenderer.invoke('settings:load-people', { token }),
   saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 

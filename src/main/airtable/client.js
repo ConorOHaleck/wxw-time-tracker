@@ -53,16 +53,26 @@ class AirtableClient {
     return text ? JSON.parse(text) : {};
   }
 
-  /** List records with an optional filterByFormula and field projection. */
+  /**
+   * List records, following Airtable's pagination so ALL matching records come
+   * back (Airtable caps each page at 100). `maxRecords` caps the total.
+   */
   async listRecords(tableId, { filterByFormula, fields, maxRecords } = {}) {
-    const params = new URLSearchParams();
-    // Return fields keyed by field id so callers can index by stable ids, not names.
-    params.set('returnFieldsByFieldId', 'true');
-    if (filterByFormula) params.set('filterByFormula', filterByFormula);
-    if (maxRecords) params.set('maxRecords', String(maxRecords));
-    if (Array.isArray(fields)) fields.forEach((f) => params.append('fields[]', f));
-    const data = await this._request('GET', `${tableId}?${params.toString()}`);
-    return data.records || [];
+    const all = [];
+    let offset;
+    do {
+      const params = new URLSearchParams();
+      // Fields keyed by id so callers index by stable ids, not names.
+      params.set('returnFieldsByFieldId', 'true');
+      if (filterByFormula) params.set('filterByFormula', filterByFormula);
+      if (Array.isArray(fields)) fields.forEach((f) => params.append('fields[]', f));
+      if (offset) params.set('offset', offset);
+      const data = await this._request('GET', `${tableId}?${params.toString()}`);
+      all.push(...(data.records || []));
+      offset = data.offset;
+      if (maxRecords && all.length >= maxRecords) return all.slice(0, maxRecords);
+    } while (offset);
+    return all;
   }
 
   async getRecord(tableId, recordId) {

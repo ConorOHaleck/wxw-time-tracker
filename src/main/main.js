@@ -6,6 +6,7 @@ const path = require('path');
 const log = require('./util/logger');
 const settingsStore = require('./settings');
 const { buildConfig } = require('./config');
+const { resolveToken, hasEmbeddedToken } = require('./token');
 const { TABLES, FIELDS } = require('./defaults');
 const { Store } = require('./store');
 const { AirtableClient } = require('./airtable/client');
@@ -221,7 +222,7 @@ async function stopEngine() {
 
 async function startEngine() {
   await stopEngine();
-  const cfg = buildConfig(currentSettings);
+  const cfg = buildConfig(currentSettings, resolveToken(currentSettings));
   if (!store) store = new Store(path.join(userData, 'state.json'));
 
   const airtable = new AirtableClient(cfg.airtable);
@@ -275,7 +276,7 @@ async function init() {
   log.info('app: starting', APP_NAME, 'userData =', userData);
 
   currentSettings = settingsStore.load(userData);
-  if (settingsStore.isComplete(currentSettings)) {
+  if (settingsStore.isComplete(currentSettings, !!resolveToken(currentSettings))) {
     await startEngine();
   } else {
     log.info('app: not configured yet — showing setup');
@@ -285,7 +286,9 @@ async function init() {
 
 // ---- IPC: status ----
 ipcMain.handle('app:get-state', () => ({
-  configured: settingsStore.isComplete(currentSettings),
+  configured: settingsStore.isComplete(currentSettings, !!resolveToken(currentSettings)),
+  // The UI hides the token field entirely when a token was baked into the build.
+  hasEmbeddedToken: hasEmbeddedToken(),
   settings: currentSettings || settingsStore.DEFAULTS,
   snapshot: engine ? engine.snapshot() : lastSnapshot,
 }));
@@ -352,25 +355,35 @@ ipcMain.handle('ble:forget-device', async () => {
 
 // ---- IPC: setup ----
 
-// Verify a token and list the TimeFlip devices/people to choose from.
-ipcMain.handle('settings:test', async (_e, { token }) => {
-  if (!token) return { ok: false, error: 'Enter your Airtable token first.' };
+// Validate the shared token and load the "select your name" list (plus the
+// TimeFlip records, for the optional manual override in Advanced).
+ipcMain.handle('settings:load-people', async (_e, { token } = {}) => {
+  const useToken = resolveToken({ airtableToken: token });
+  if (!useToken) return { ok: false, error: 'Enter the shared Airtable token first.' };
   try {
-    const at = new AirtableClient({ token, baseId: require('./defaults').BASE_ID });
+    const at = new AirtableClient({ token: useToken, baseId: require('./defaults').BASE_ID });
 
-    // Who owns this token? Used to resolve your device automatically.
-    let meId = null;
-    let meEmail = null;
-    try {
-      const me = await at.whoami();
-      meId = (me && me.id) || null;
-      meEmail = (me && me.email) || null;
-    } catch (err) {
-      log.warn('app: whoami failed during connection test:', err.message);
-    }
+    // People to choose from. Only those with a linked Airtable User who can
+    // actually be a collaborator on the base — otherwise logging Hours under
+    // their name would fail. We read only name + user; never any PII field.
+    const peopleRecs = await at.listRecords(TABLES.people, { maxRecords: 1000 });
+    const people = peopleRecs
+      .map((r) => {
+        const name = r.fields[FIELDS.people.name];
+        const u = r.fields[FIELDS.people.airtableUser];
+        const user = Array.isArray(u) ? u[0] : u;
+        if (!name || !user || !user.id) return null;
+        if (user.permissionLevel === 'none') return null; // not a base collaborator
+        return { userId: user.id, name: String(name) };
+      })
+      .filter(Boolean)
+      // De-dupe: the same person can appear on multiple People rows.
+      .filter((p, i, arr) => arr.findIndex((q) => q.userId === p.userId) === i)
+      .sort((a, b) => a.name.localeCompare(b.name));
 
-    const records = await at.listRecords(TABLES.timeflip, { maxRecords: 100 });
-    const devices = records.map((r) => {
+    // TimeFlip records, for the optional "use someone else's setup" override.
+    const tfRecs = await at.listRecords(TABLES.timeflip, { maxRecords: 100 });
+    const devices = tfRecs.map((r) => {
       const users = r.fields[FIELDS.timeflip.airtableUserFromAssignee];
       let who = 'Unassigned TimeFlip';
       let assigneeUserId = null;
@@ -378,27 +391,18 @@ ipcMain.handle('settings:test', async (_e, { token }) => {
         who = users[0].name || users[0].email || who;
         assigneeUserId = users[0].id || null;
       }
-      const isYou = !!(meId && assigneeUserId && assigneeUserId === meId);
-      return { recordId: r.id, who, label: isYou ? `${who}  (you)` : who, isYou };
+      return { recordId: r.id, label: who, assigneeUserId };
     });
 
-    // Which record is "yours"? Exactly one match means no picking required.
-    const mine = devices.filter((d) => d.isYou);
-    return {
-      ok: true,
-      devices,
-      identified: !!meId,
-      meName: (mine[0] && mine[0].who) || meEmail || null,
-      matchCount: mine.length,
-      autoRecordId: mine.length === 1 ? mine[0].recordId : null,
-    };
+    return { ok: true, people, devices };
   } catch (err) {
     const msg = /401|AUTHENTICATION/i.test(err.message)
-      ? 'That token was rejected. Check it has read+write access to the WxW Delivery base.'
+      ? 'That token was rejected. Check it has read access to the WxW Delivery base.'
       : err.message;
     return { ok: false, error: msg };
   }
 });
+
 
 ipcMain.handle('settings:get', () => currentSettings || settingsStore.DEFAULTS);
 
@@ -412,8 +416,11 @@ ipcMain.handle('settings:save', async (_e, incoming) => {
   } catch (err) {
     return { ok: false, error: `Couldn't save settings: ${err.message}` };
   }
-  if (!settingsStore.isComplete(currentSettings)) {
-    return { ok: false, error: 'Please enter a token and choose your device.' };
+  if (!resolveToken(currentSettings)) {
+    return { ok: false, error: 'The shared Airtable token is missing. Add it under Advanced.' };
+  }
+  if (!currentSettings.selectedUserId) {
+    return { ok: false, error: 'Please select your name from the list.' };
   }
   const res = await startEngine();
   return res;

@@ -18,7 +18,12 @@ const log = require('./util/logger');
  *   }
  */
 const DEFAULTS = {
+  // Shared connection token (only used if no token was embedded at build time).
   airtableToken: '',
+  // Who this person is — chosen from the name list. Their Airtable user id is
+  // what time is logged under and what resolves their TimeFlip setup.
+  selectedUserId: '',
+  selectedPersonName: '',
   timeflipRecordId: '',
   useProduction: false,
   bleNamePrefix: 'TimeFlip',
@@ -57,12 +62,12 @@ function save(userDataDir, settings) {
 }
 
 /**
- * True once the app has enough to run. Only the token is required — the
- * TimeFlip record is resolved from the token's own user at load time, and
- * `timeflipRecordId` is just an optional manual override.
+ * True once the app has enough to run: a usable token (embedded or entered) and
+ * a selected person. `hasToken` is passed in because the embedded token lives
+ * outside settings.
  */
-function isComplete(settings) {
-  return !!(settings && settings.airtableToken);
+function isComplete(settings, hasToken) {
+  return !!(settings && settings.selectedUserId && hasToken);
 }
 
 module.exports = { DEFAULTS, load, save, isComplete, filePath };
