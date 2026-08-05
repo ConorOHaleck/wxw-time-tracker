@@ -96,19 +96,17 @@ function render(s) {
   setChip('deliverableChip', s2.tracking && s2.deliverableName);
 
   $('sessionStart').textContent = fmtTime(s2.sessionStartMs);
+  $('lastSynced').textContent = s2.lastSyncedMs
+    ? new Date(s2.lastSyncedMs).toLocaleString([], {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+    : '—';
 
   if (s2.error) showFatal('Heads up: ' + s2.error);
-}
-
-/** Compact "time since": 45s, 3m 05s, 1h 04m. */
-function fmtSince(ms) {
-  const sec = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  if (h) return `${h}h ${String(m).padStart(2, '0')}m`;
-  if (m) return `${m}m ${String(s).padStart(2, '0')}s`;
-  return `${s}s`;
 }
 
 function tickElapsed() {
@@ -121,10 +119,6 @@ function tickElapsed() {
   } else {
     $('elapsed').textContent = '';
   }
-
-  // Live "time since last Airtable sync".
-  $('lastSynced').textContent =
-    snapshot && snapshot.lastSyncedMs ? `${fmtSince(Date.now() - snapshot.lastSyncedMs)} ago` : '—';
 }
 
 function showFatal(msg) {

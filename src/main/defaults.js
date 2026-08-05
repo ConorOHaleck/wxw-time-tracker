@@ -85,8 +85,10 @@ const FIELDS = {
 
 // The "select your name" list is limited to active What by When staff.
 const PEOPLE_FILTER = {
-  activeStatusChoiceId: 'selnT76Iaz2sv83bd', // Status = "Active"
-  whatByWhenCompanyId: 'rec72L0zvfPLmRVAp', // Company = "What by When"
+  // The REST API returns a singleSelect value as the option NAME (a string), not
+  // its id — so Status is matched by name. Company is a link, matched by record id.
+  activeStatusName: 'Active',
+  whatByWhenCompanyId: 'rec72L0zvfPLmRVAp',
 };
 
 const TRACKING_DEFAULTS = {

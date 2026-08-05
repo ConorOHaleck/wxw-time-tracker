@@ -380,8 +380,8 @@ ipcMain.handle('settings:load-people', async (_e, { token } = {}) => {
         const status = r.fields[pf.status];
         const companies = r.fields[pf.company];
         if (!name || !user || !user.id) return null;
-        if (user.permissionLevel === 'none') return null; // not a base collaborator
-        if (!status || status.id !== PEOPLE_FILTER.activeStatusChoiceId) return null; // Active only
+        if (user.permissionLevel === 'none') return null; // not a base collaborator (when present)
+        if (status !== PEOPLE_FILTER.activeStatusName) return null; // Active only
         if (!Array.isArray(companies) || !companies.includes(PEOPLE_FILTER.whatByWhenCompanyId)) {
           return null; // What by When only
         }
