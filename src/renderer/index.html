@@ -24,41 +24,21 @@
 
       <div class="step">
         <div class="step-head"><span class="num">1</span> Who are you?</div>
-
-        <!-- Only shown when a shared token isn't baked into the build (admin setup). -->
-        <div id="tokenRow" class="hidden">
-          <label for="token">Shared Airtable token</label>
-          <input id="token" type="password" placeholder="patXXXXXXXXXXXXXX..." autocomplete="off" spellcheck="false" />
-          <div class="hint">
-            Set up once for the team by an admin. <a href="#" id="tokenHelp">Where do I get one?</a>
-          </div>
-          <button id="connectBtn" class="secondary">Connect</button>
-          <div id="testMsg" class="msg hidden"></div>
-        </div>
-
         <label for="personSelect">Your name</label>
         <select id="personSelect" disabled>
           <option value="">Loading names…</option>
         </select>
         <div class="hint">Pick your name — your time is logged under it, and your own TimeFlip faces apply.</div>
+        <div id="loadMsg" class="msg hidden"></div>
         <div id="deviceWarn" class="warn hidden"></div>
-      </div>
-
-      <div class="step">
-        <div class="step-head"><span class="num">2</span> Where should time go?</div>
-        <label class="radio">
-          <input type="radio" name="target" value="testing" checked />
-          <span><b>Hours Testing</b> — practice safely (recommended while trying it out)</span>
-        </label>
-        <label class="radio">
-          <input type="radio" name="target" value="production" />
-          <span><b>Hours</b> — real hours that feed payroll</span>
-        </label>
-        <div id="prodWarn" class="warn hidden">⚠ The <b>Hours</b> table feeds timesheets and payroll. Only use it once you've confirmed everything is working.</div>
       </div>
 
       <details class="advanced">
         <summary>Advanced options</summary>
+        <label class="radio" for="devMode">
+          <input type="checkbox" id="devMode" />
+          <span><b>Development mode</b> — save time to <b>Hours Testing</b> instead of the real Hours table (for testing; not added to payroll)</span>
+        </label>
         <label class="radio" for="manualDevice">
           <input type="checkbox" id="manualDevice" />
           <span>Use a specific TimeFlip setup (instead of the one assigned to my name)</span>
@@ -86,19 +66,21 @@
 
       <div class="card">
         <div class="face" id="faceBig">–</div>
-        <div class="role-chip hidden" id="roleChip"></div>
+        <div class="chips">
+          <span class="chip role-chip hidden" id="roleChip"></span>
+          <span class="chip deliverable-chip hidden" id="deliverableChip"></span>
+        </div>
         <div class="face-label" id="faceLabel">Waiting for device…</div>
         <div class="elapsed-big" id="elapsed"></div>
       </div>
 
+      <div class="status-pill-row">
+        <span class="status-pill red" id="statusPill">Disconnected</span>
+      </div>
+
       <div class="grid">
         <div class="kv"><span>Connection</span><b id="conn">—</b></div>
-        <div class="kv"><span>Device</span><b id="deviceName">—</b></div>
-        <div class="kv"><span>Currently clocking</span><b id="trackState">—</b></div>
-        <div class="kv"><span>Billable role</span><b id="billableRole">—</b></div>
         <div class="kv"><span>Started</span><b id="sessionStart">—</b></div>
-        <div class="kv"><span>Faces set up</span><b id="faceCount">—</b></div>
-        <div class="kv"><span>Saving time to</span><b id="hoursTable">—</b></div>
       </div>
 
       <!-- Device picker: shown on demand, or nudged when we can't auto-connect. -->
@@ -117,8 +99,12 @@
         </div>
       </div>
 
+      <div class="sync-row" title="Time since the app last loaded face, Adventure and Deliverable assignments from Airtable.">
+        <span class="sync-label">Last synced with Airtable: <b id="lastSynced">—</b></span>
+        <button id="resyncBtn" class="secondary" title="Re-read this device's faces from Airtable — use after changing a face's Adventure, Billable Role, Hour Type, Deliverable or Status.">Resync faces</button>
+      </div>
+
       <section class="actions">
-        <button id="resyncBtn" class="secondary" title="Re-read this device's faces from Airtable — use after changing a face's Adventure, Billable Role, Hour Type or Status.">Resync faces</button>
         <button id="reconcileBtn" class="secondary" title="Import any time the die recorded while the app was closed or out of range.">Sync past time</button>
       </section>
       <div id="actionMsg" class="msg hidden"></div>

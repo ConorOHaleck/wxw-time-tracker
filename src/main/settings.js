@@ -25,7 +25,9 @@ const DEFAULTS = {
   selectedUserId: '',
   selectedPersonName: '',
   timeflipRecordId: '',
-  useProduction: false,
+  // Save to the real Hours table by default; Development mode flips this to
+  // Hours Testing.
+  useProduction: true,
   bleNamePrefix: 'TimeFlip',
   // The exact paired device, learned on first successful connect (or set via the
   // "Choose device" picker). Once set, the app reconnects to this exact device

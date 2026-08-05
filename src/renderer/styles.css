@@ -211,17 +211,44 @@ select:disabled { opacity: 0.6; }
   word-break: break-word;
   padding: 0 4px;
 }
-/* Billable role for the active session, shown under the Adventure name. */
-.role-chip {
+/* Connection status badge directly under the face card. */
+.status-pill-row { text-align: center; margin: -6px 0 16px; }
+.status-pill {
   display: inline-block;
+  padding: 5px 16px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fff;
+}
+.status-pill.red { background: var(--red); }
+.status-pill.blue { background: var(--accent); }
+.status-pill.green { background: var(--green); }
+
+/* Pills under the Adventure name: billable role + deliverable. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
   margin-top: 10px;
+}
+.chip {
   padding: 3px 10px;
   border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.role-chip {
   background: rgba(79, 140, 255, 0.14);
   border: 1px solid rgba(79, 140, 255, 0.45);
   color: var(--accent);
-  font-size: 12px;
-  font-weight: 600;
+}
+.deliverable-chip {
+  background: rgba(52, 199, 89, 0.14);
+  border: 1px solid rgba(52, 199, 89, 0.45);
+  color: var(--green);
 }
 
 .face-label { margin-top: 8px; color: var(--muted); font-size: 13px; }
@@ -245,6 +272,19 @@ select:disabled { opacity: 0.6; }
 }
 .kv span { color: var(--muted); }
 .kv b { font-weight: 600; }
+
+/* "Last synced with Airtable" (left) + Resync button (right), on one row. */
+.sync-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.sync-label b { color: var(--text); font-variant-numeric: tabular-nums; }
+.sync-row button { flex: 0 0 auto; width: auto; padding: 8px 14px; font-size: 13px; }
 
 .actions { display: flex; gap: 10px; }
 button {

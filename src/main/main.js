@@ -7,7 +7,7 @@ const log = require('./util/logger');
 const settingsStore = require('./settings');
 const { buildConfig } = require('./config');
 const { resolveToken, hasEmbeddedToken } = require('./token');
-const { TABLES, FIELDS } = require('./defaults');
+const { TABLES, FIELDS, PEOPLE_FILTER } = require('./defaults');
 const { Store } = require('./store');
 const { AirtableClient } = require('./airtable/client');
 const { FaceMapper } = require('./airtable/mapper');
@@ -359,21 +359,32 @@ ipcMain.handle('ble:forget-device', async () => {
 // TimeFlip records, for the optional manual override in Advanced).
 ipcMain.handle('settings:load-people', async (_e, { token } = {}) => {
   const useToken = resolveToken({ airtableToken: token });
-  if (!useToken) return { ok: false, error: 'Enter the shared Airtable token first.' };
+  if (!useToken) return { ok: false, error: 'No Airtable token is configured in this build.' };
   try {
     const at = new AirtableClient({ token: useToken, baseId: require('./defaults').BASE_ID });
 
-    // People to choose from. Only those with a linked Airtable User who can
-    // actually be a collaborator on the base — otherwise logging Hours under
-    // their name would fail. We read only name + user; never any PII field.
-    const peopleRecs = await at.listRecords(TABLES.people, { maxRecords: 1000 });
+    // People to choose from: active What by When staff who have a linked Airtable
+    // User that can be a base collaborator (otherwise logging Hours under their
+    // name would fail). Only the four fields we need are requested, so the
+    // sensitive PII columns are never fetched.
+    const pf = FIELDS.people;
+    const peopleRecs = await at.listRecords(TABLES.people, {
+      maxRecords: 1000,
+      fields: [pf.name, pf.airtableUser, pf.status, pf.company],
+    });
     const people = peopleRecs
       .map((r) => {
-        const name = r.fields[FIELDS.people.name];
-        const u = r.fields[FIELDS.people.airtableUser];
+        const name = r.fields[pf.name];
+        const u = r.fields[pf.airtableUser];
         const user = Array.isArray(u) ? u[0] : u;
+        const status = r.fields[pf.status];
+        const companies = r.fields[pf.company];
         if (!name || !user || !user.id) return null;
         if (user.permissionLevel === 'none') return null; // not a base collaborator
+        if (!status || status.id !== PEOPLE_FILTER.activeStatusChoiceId) return null; // Active only
+        if (!Array.isArray(companies) || !companies.includes(PEOPLE_FILTER.whatByWhenCompanyId)) {
+          return null; // What by When only
+        }
         return { userId: user.id, name: String(name) };
       })
       .filter(Boolean)
@@ -417,7 +428,7 @@ ipcMain.handle('settings:save', async (_e, incoming) => {
     return { ok: false, error: `Couldn't save settings: ${err.message}` };
   }
   if (!resolveToken(currentSettings)) {
-    return { ok: false, error: 'The shared Airtable token is missing. Add it under Advanced.' };
+    return { ok: false, error: 'No Airtable token is configured in this build.' };
   }
   if (!currentSettings.selectedUserId) {
     return { ok: false, error: 'Please select your name from the list.' };

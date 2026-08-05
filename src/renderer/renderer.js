@@ -5,12 +5,6 @@ let snapshot = null;
 let pairedName = '';
 let devices = [];
 
-// Friendly names for the two Hours tables (ids baked into the app).
-const TABLE_LABELS = {
-  tbll6GJlXkJyjhPom: 'Hours Testing',
-  tblOtz0vowbHJnuAG: 'Hours',
-};
-
 function show(view) {
   $('setupView').classList.toggle('hidden', view !== 'setup');
   $('statusView').classList.toggle('hidden', view !== 'status');
@@ -26,6 +20,17 @@ function fmtTime(ms) {
   return new Date(ms).toLocaleTimeString();
 }
 
+/** Show a pill with `value` as its text, or hide it when `value` is falsy. */
+function setChip(id, value) {
+  const el = $(id);
+  if (value) {
+    el.textContent = value;
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
 function render(s) {
   snapshot = s || snapshot;
   if (!snapshot) return;
@@ -33,11 +38,6 @@ function render(s) {
 
   $('conn').textContent = s2.connected ? 'Connected' : s2.bleState || 'disconnected';
 
-  $('deviceName').textContent = s2.connected
-    ? pairedName || 'Connected'
-    : pairedName
-      ? `${pairedName} (offline)`
-      : 'Not paired';
   $('deviceHint').textContent = s2.connected
     ? `Connected to ${pairedName || 'your TimeFlip'}`
     : pairedName
@@ -46,20 +46,36 @@ function render(s) {
 
   const faceEl = $('faceBig');
   const face = s2.currentFacet > 0 ? s2.currentFacet : s2.deviceFacet;
+  const label = $('faceLabel');
   if (s2.tracking) {
-    // Actually logging time — show the Adventure assigned to this face.
+    // Actually logging time — show the Adventure, no redundant "Tracking · face" line.
     faceEl.textContent = s2.adventureName || `Face ${s2.currentFacet}`;
     faceEl.className = 'face' + (s2.adventureName ? ' name' : '');
-    $('faceLabel').textContent = `Tracking · face ${s2.currentFacet}`;
+    label.classList.add('hidden');
   } else if (face > 0) {
     // A face is up but we are NOT logging it — say exactly why.
     faceEl.textContent = `Face ${face}`;
     faceEl.className = 'face idle';
-    $('faceLabel').textContent = s2.notTrackingReason || 'This face isn’t set to track time';
+    label.textContent = s2.notTrackingReason || 'This face isn’t set to track time';
+    label.classList.remove('hidden');
   } else {
     faceEl.textContent = '–';
     faceEl.className = 'face idle';
-    $('faceLabel').textContent = s2.connected ? 'No face detected' : 'Looking for your TimeFlip…';
+    label.textContent = s2.connected ? 'No face detected' : 'Looking for your TimeFlip…';
+    label.classList.remove('hidden');
+  }
+
+  // Status pill: Disconnected (red) / Connected but idle (blue) / Tracking (green).
+  const pill = $('statusPill');
+  if (!s2.connected) {
+    pill.textContent = 'Disconnected';
+    pill.className = 'status-pill red';
+  } else if (s2.tracking) {
+    pill.textContent = 'Tracking';
+    pill.className = 'status-pill green';
+  } else {
+    pill.textContent = 'Connected';
+    pill.className = 'status-pill blue';
   }
 
   // Practice mode — make it obvious this time won't reach payroll.
@@ -74,23 +90,25 @@ function render(s) {
     ownerWarn.classList.add('hidden');
   }
 
-  // Billable role — the same person can hold several roles on one Adventure,
-  // so this is what distinguishes two faces pointing at the same project.
-  const roleChip = $('roleChip');
-  if (s2.tracking && s2.billableRoleName) {
-    roleChip.textContent = s2.billableRoleName;
-    roleChip.classList.remove('hidden');
-  } else {
-    roleChip.classList.add('hidden');
-  }
-  $('billableRole').textContent = s2.billableRoleName || '—';
+  // Pills under the Adventure name: billable role (distinguishes two faces on
+  // the same project) and, if set, the associated Deliverable.
+  setChip('roleChip', s2.tracking && s2.billableRoleName);
+  setChip('deliverableChip', s2.tracking && s2.deliverableName);
 
-  $('trackState').textContent = s2.tracking ? 'Yes' : 'No';
   $('sessionStart').textContent = fmtTime(s2.sessionStartMs);
-  $('faceCount').textContent = s2.faceCount != null ? s2.faceCount : '—';
-  $('hoursTable').textContent = TABLE_LABELS[s2.hoursTable] || s2.hoursTable || '—';
 
   if (s2.error) showFatal('Heads up: ' + s2.error);
+}
+
+/** Compact "time since": 45s, 3m 05s, 1h 04m. */
+function fmtSince(ms) {
+  const sec = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h) return `${h}h ${String(m).padStart(2, '0')}m`;
+  if (m) return `${m}m ${String(s).padStart(2, '0')}s`;
+  return `${s}s`;
 }
 
 function tickElapsed() {
@@ -103,6 +121,10 @@ function tickElapsed() {
   } else {
     $('elapsed').textContent = '';
   }
+
+  // Live "time since last Airtable sync".
+  $('lastSynced').textContent =
+    snapshot && snapshot.lastSyncedMs ? `${fmtSince(Date.now() - snapshot.lastSyncedMs)} ago` : '—';
 }
 
 function showFatal(msg) {
@@ -116,16 +138,15 @@ let people = []; // [{userId, name}] for the "your name" dropdown
 
 function prefillSetup(settings) {
   if (!settings) return;
-  $('token').value = settings.airtableToken || '';
   window.__savedUserId = settings.selectedUserId || '';
   window.__savedRecordId = settings.timeflipRecordId || '';
   $('manualDevice').checked = !!settings.timeflipRecordId;
   $('bleName').value = settings.bleNamePrefix || 'TimeFlip';
   $('minSession').value = settings.minSessionSeconds ?? 30;
   $('pauseFaces').value = (settings.pauseFaces || []).join(', ');
-  const target = settings.useProduction ? 'production' : 'testing';
-  document.querySelector(`input[name="target"][value="${target}"]`).checked = true;
-  $('prodWarn').classList.toggle('hidden', target !== 'production');
+  // Development mode = save to Hours Testing (i.e. NOT production). Production
+  // (real Hours) is the default.
+  $('devMode').checked = settings.useProduction === false;
   updateOverrideVisibility();
 }
 
@@ -135,21 +156,16 @@ function setMsg(el, text, kind) {
   el.classList.remove('hidden');
 }
 
-/** Load the "select your name" list (and the override device list) via the shared token. */
+/** Load the "select your name" list (and the override device list) from the shared token. */
 async function loadPeople() {
-  const btn = $('connectBtn');
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = 'Connecting…';
-  }
   const sel = $('personSelect');
   sel.disabled = true;
   sel.innerHTML = '<option value="">Loading names…</option>';
   try {
-    const res = await window.timeflip.loadPeople($('token').value.trim());
+    const res = await window.timeflip.loadPeople();
     if (!res.ok) {
       sel.innerHTML = '<option value="">Couldn’t load names</option>';
-      setMsg($('testMsg'), res.error, 'error');
+      setMsg($('loadMsg'), res.error, 'error');
       return;
     }
     people = res.people || [];
@@ -176,16 +192,11 @@ async function loadPeople() {
     }
     if (window.__savedRecordId) dsel.value = window.__savedRecordId;
 
-    $('testMsg').classList.add('hidden');
+    $('loadMsg').classList.add('hidden');
     refreshDeviceWarning();
     refreshSaveEnabled();
   } catch (err) {
-    setMsg($('testMsg'), err.message, 'error');
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = 'Connect';
-    }
+    setMsg($('loadMsg'), err.message, 'error');
   }
 }
 
@@ -216,7 +227,7 @@ function refreshDeviceWarning() {
 }
 
 async function saveSettings() {
-  const useProduction = document.querySelector('input[name="target"]:checked').value === 'production';
+  const useProduction = !$('devMode').checked;
   const pauseFaces = $('pauseFaces')
     .value.split(',')
     .map((s) => parseInt(s.trim(), 10))
@@ -225,7 +236,6 @@ async function saveSettings() {
   const settings = {
     selectedUserId: nameSel.value,
     selectedPersonName: nameSel.selectedIndex > 0 ? nameSel.options[nameSel.selectedIndex].text : '',
-    airtableToken: $('token').value.trim(),
     // A value = deliberately use a specific setup; empty = the one assigned to me.
     timeflipRecordId: $('manualDevice').checked ? $('deviceSelect').value : '',
     useProduction,
@@ -330,7 +340,6 @@ window.timeflip.onFatal(showFatal);
 window.timeflip.onShowSetup(() => show('setup'));
 
 $('settingsBtn').addEventListener('click', () => show('setup'));
-$('connectBtn').addEventListener('click', loadPeople);
 $('personSelect').addEventListener('change', () => {
   refreshDeviceWarning();
   refreshSaveEnabled();
@@ -338,15 +347,6 @@ $('personSelect').addEventListener('change', () => {
 $('deviceSelect').addEventListener('change', refreshDeviceWarning);
 $('manualDevice').addEventListener('change', updateOverrideVisibility);
 $('saveBtn').addEventListener('click', saveSettings);
-$('tokenHelp').addEventListener('click', (e) => {
-  e.preventDefault();
-  window.timeflip.openExternal('https://airtable.com/create/tokens');
-});
-document.querySelectorAll('input[name="target"]').forEach((r) =>
-  r.addEventListener('change', () => {
-    $('prodWarn').classList.toggle('hidden', document.querySelector('input[name="target"]:checked').value !== 'production');
-  })
-);
 
 $('reconcileBtn').addEventListener('click', async () => {
   const btn = $('reconcileBtn');
@@ -388,12 +388,8 @@ $('resyncBtn').addEventListener('click', async () => {
   pairedName = (state.settings && state.settings.bleDeviceName) || '';
   prefillSetup(state.settings);
 
-  // Hide the token field entirely when a token is baked into the build.
-  $('tokenRow').classList.toggle('hidden', !!state.hasEmbeddedToken);
-
-  // Load the name list right away if we already have a usable token.
-  const haveToken = state.hasEmbeddedToken || (state.settings && state.settings.airtableToken);
-  if (haveToken) loadPeople();
+  // The shared token is baked into the build — load the name list right away.
+  loadPeople();
 
   refreshSaveEnabled();
   if (state.configured) {

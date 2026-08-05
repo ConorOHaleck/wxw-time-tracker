@@ -14,6 +14,7 @@ const TABLES = {
   faces: 'tblVakgKaD6vfNj8l',
   adventures: 'tblCSJIhA8QpXVfsl',
   billableRoles: 'tblDkZbJpIQiphlF8',
+  deliverables: 'tblDD6wLbGyQtZ4AZ',
   people: 'tblDM0kyR5FtWtu1W',
   hoursTesting: 'tbll6GJlXkJyjhPom',
   hoursProduction: 'tblOtz0vowbHJnuAG',
@@ -27,15 +28,17 @@ const FIELDS = {
   },
   people: {
     // Used only to build the "select your name" list. We read the display name,
-    // the linked Airtable User (whose id time is logged under), and Status.
-    // We deliberately never touch the sensitive PII fields in this table.
+    // the linked Airtable User (whose id time is logged under), Status, and
+    // Company — and nothing else, so the sensitive PII fields are never fetched.
     name: 'fld6iNYarSDxlaN83',
     airtableUser: 'fldNsvKz30pzeUtds',
     status: 'fldMbtMgFEIztIU1D',
+    company: 'flducX6cRJfxtoiyQ',
   },
   faces: {
     faceNumber: 'fldfI8hgi4cLeVh1e',
     adventures: 'fldOijNaTKvKnbpS1',
+    deliverable: 'fld4iNVh8BW4jCWK3',
     billableRole: 'fld6ZQVSWeLR8vght',
     hourType: 'fldnXNSvcDUKepKjA',
     timeflipLink: 'fldzgh2sV2Yb6eQ33',
@@ -53,6 +56,12 @@ const FIELDS = {
     // on one Adventure, so this is what tells two such faces apart.
     role: 'fldfQTrMQlm8rc0QR',
     name: 'fldx1S3OVDB2Uq8P3',
+  },
+  deliverables: {
+    // Prefer the clean "Name" ("TRMC Whitepaper"); fall back to the "Title"
+    // primary formula, which carries id prefixes and status suffixes.
+    name: 'flddjEH2JYdk1FXpT',
+    title: 'fldIacQZFV3pWkmb4',
   },
   // The two Hours tables have different field IDs; the active set is chosen by
   // the "use production" toggle.
@@ -74,6 +83,12 @@ const FIELDS = {
   },
 };
 
+// The "select your name" list is limited to active What by When staff.
+const PEOPLE_FILTER = {
+  activeStatusChoiceId: 'selnT76Iaz2sv83bd', // Status = "Active"
+  whatByWhenCompanyId: 'rec72L0zvfPLmRVAp', // Company = "What by When"
+};
+
 const TRACKING_DEFAULTS = {
   pauseFaces: [],
   minSessionSeconds: 30,
@@ -81,4 +96,4 @@ const TRACKING_DEFAULTS = {
   historyDurationLittleEndian: true,
 };
 
-module.exports = { BASE_ID, TABLES, FIELDS, TRACKING_DEFAULTS };
+module.exports = { BASE_ID, TABLES, FIELDS, PEOPLE_FILTER, TRACKING_DEFAULTS };

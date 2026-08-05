@@ -52,6 +52,8 @@ class FaceMapper {
 
     const faceLinks = tf.fields[this.f.timeflip.faces] || [];
     await this._loadFaces(faceLinks);
+    // When we last pulled face/adventure/deliverable data from Airtable.
+    this.lastLoadedMs = Date.now();
     log.info(
       `mapper: loaded TimeFlip ${this.timeflipRecordId} with ${this.faceMap.size} faces; ` +
         `logging time as ${this.selectedName || this.hoursUserId || '(nobody)'} ` +
@@ -111,7 +113,9 @@ class FaceMapper {
         faceRecordId: rec.id,
         faceNumber: Number(faceNumber),
         adventureId: this._firstLink(rec.fields[ff.adventures]),
-        adventureName: null, // both filled in by _resolveLinkedNames
+        adventureName: null, // resolved by _resolveLinkedNames
+        deliverableId: this._firstLink(rec.fields[ff.deliverable]),
+        deliverableName: null,
         billableRoleId: this._firstLink(rec.fields[ff.billableRole]),
         billableRoleName: null,
         hourType: rec.fields[ff.hourType] || null,
@@ -131,6 +135,7 @@ class FaceMapper {
     const faces = [...this.faceMap.values()];
     const af = this.f.adventures;
     const bf = this.f.billableRoles;
+    const df = this.f.deliverables;
 
     const advNames = await this._fetchNames(
       [...new Set(faces.map((m) => m.adventureId).filter(Boolean))],
@@ -142,10 +147,16 @@ class FaceMapper {
       this.tables.billableRoles,
       [bf.role, bf.name]
     );
+    const delNames = await this._fetchNames(
+      [...new Set(faces.map((m) => m.deliverableId).filter(Boolean))],
+      this.tables.deliverables,
+      [df.name, df.title]
+    );
 
     for (const m of faces) {
       m.adventureName = m.adventureId ? advNames.get(m.adventureId) || null : null;
       m.billableRoleName = m.billableRoleId ? roleNames.get(m.billableRoleId) || null : null;
+      m.deliverableName = m.deliverableId ? delNames.get(m.deliverableId) || null : null;
     }
   }
 

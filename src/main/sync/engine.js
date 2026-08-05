@@ -309,8 +309,11 @@ class SyncEngine extends EventEmitter {
       adventureId: map ? map.adventureId : null,
       adventureName: map ? map.adventureName : null,
       billableRoleName: map ? map.billableRoleName : null,
+      deliverableName: map ? map.deliverableName : null,
       hourType: map ? map.hourType : null,
       lastEventNumber: this.store.lastEventNumber,
+      // When the face/adventure/deliverable data was last loaded from Airtable.
+      lastSyncedMs: this.mapper.lastLoadedMs || null,
       assigneeUserId: this.mapper.assigneeUserId,
       // Set when the picked device belongs to someone else (time still logs as you).
       ownerWarning: this.mapper.ownerWarning(),
