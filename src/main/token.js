@@ -18,8 +18,9 @@ let embedded;
 function embeddedToken() {
   if (embedded === undefined) {
     try {
+      // token.js is src/main/token.js; the generated file is src/generated/token.json.
       // eslint-disable-next-line global-require
-      const data = require('./generated/token.json');
+      const data = require('../generated/token.json');
       embedded = (data && typeof data.token === 'string' && data.token) || '';
       if (embedded) log.info('token: using build-time embedded shared token');
     } catch {
