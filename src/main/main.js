@@ -7,7 +7,7 @@ const log = require('./util/logger');
 const settingsStore = require('./settings');
 const { buildConfig } = require('./config');
 const { resolveToken, hasEmbeddedToken } = require('./token');
-const { TABLES, FIELDS, PEOPLE_FILTER } = require('./defaults');
+const { TABLES, FIELDS, PEOPLE_ACTIVE_VIEW } = require('./defaults');
 const { Store } = require('./store');
 const { AirtableClient } = require('./airtable/client');
 const { FaceMapper } = require('./airtable/mapper');
@@ -363,28 +363,21 @@ ipcMain.handle('settings:load-people', async (_e, { token } = {}) => {
   try {
     const at = new AirtableClient({ token: useToken, baseId: require('./defaults').BASE_ID });
 
-    // People to choose from: active What by When staff who have a linked Airtable
-    // User that can be a base collaborator (otherwise logging Hours under their
-    // name would fail). Only the four fields we need are requested, so the
-    // sensitive PII columns are never fetched.
+    // People to choose from come straight from the "Active WxW Team" view, which
+    // already encodes the active-staff filter. We only need those with a linked
+    // Airtable User (that user id is what Hours are logged under). Only two fields
+    // are requested, so the sensitive PII columns are never fetched.
     const pf = FIELDS.people;
     const peopleRecs = await at.listRecords(TABLES.people, {
-      maxRecords: 1000,
-      fields: [pf.name, pf.airtableUser, pf.status, pf.company],
+      view: PEOPLE_ACTIVE_VIEW,
+      fields: [pf.name, pf.airtableUser],
     });
     const people = peopleRecs
       .map((r) => {
         const name = r.fields[pf.name];
         const u = r.fields[pf.airtableUser];
         const user = Array.isArray(u) ? u[0] : u;
-        const status = r.fields[pf.status];
-        const companies = r.fields[pf.company];
         if (!name || !user || !user.id) return null;
-        if (user.permissionLevel === 'none') return null; // not a base collaborator (when present)
-        if (status !== PEOPLE_FILTER.activeStatusName) return null; // Active only
-        if (!Array.isArray(companies) || !companies.includes(PEOPLE_FILTER.whatByWhenCompanyId)) {
-          return null; // What by When only
-        }
         return { userId: user.id, name: String(name) };
       })
       .filter(Boolean)

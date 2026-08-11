@@ -57,13 +57,14 @@ class AirtableClient {
    * List records, following Airtable's pagination so ALL matching records come
    * back (Airtable caps each page at 100). `maxRecords` caps the total.
    */
-  async listRecords(tableId, { filterByFormula, fields, maxRecords } = {}) {
+  async listRecords(tableId, { filterByFormula, fields, maxRecords, view } = {}) {
     const all = [];
     let offset;
     do {
       const params = new URLSearchParams();
       // Fields keyed by id so callers index by stable ids, not names.
       params.set('returnFieldsByFieldId', 'true');
+      if (view) params.set('view', view); // return only records visible in this view
       if (filterByFormula) params.set('filterByFormula', filterByFormula);
       if (Array.isArray(fields)) fields.forEach((f) => params.append('fields[]', f));
       if (offset) params.set('offset', offset);

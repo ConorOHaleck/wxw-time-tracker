@@ -1,13 +1,15 @@
 :root {
-  --bg: #14161a;
-  --card: #1d2026;
-  --line: #2a2e36;
-  --text: #e8eaed;
-  --muted: #9aa0a6;
-  --accent: #4f8cff;
-  --green: #34c759;
-  --red: #ff453a;
-  --amber: #ff9f0a;
+  /* WxW Brand Assets palette (Coal, Basalt, Cloud, Saber, Neon, Spark, Card). */
+  --bg: #1e1d19;
+  --card: #2c2b26;      /* Coal */
+  --line: #45433b;
+  --text: #f2f2f2;      /* Cloud */
+  --muted: #a49d8f;
+  --accent: #6a75c9;    /* Saber */
+  --green: #cced03;     /* Neon */
+  --red: #ff7477;       /* Spark */
+  --amber: #f2d658;     /* Card */
+  --inset: #191814;
 }
 
 * { box-sizing: border-box; }
@@ -30,6 +32,18 @@ header {
 }
 
 header h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; }
+
+/* The color logo is designed for light backgrounds, so it sits on a Cloud plate. */
+.logo-plate {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  background: #f2f2f2;
+  border-radius: 8px;
+  padding: 5px 9px;
+}
+.logo-plate img { height: 20px; width: auto; display: block; }
+.app-tag { flex: 1; color: var(--muted); font-size: 13px; font-weight: 600; }
 
 /* Primary action in the header slot (setup screen). */
 .header-btn {
@@ -79,7 +93,7 @@ header h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; }
 label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 5px; }
 input[type="text"], input[type="password"], input[type="number"], select {
   width: 100%;
-  background: #0f1115;
+  background: var(--inset);
   border: 1px solid var(--line);
   color: var(--text);
   border-radius: 8px;
@@ -92,14 +106,14 @@ select:disabled { opacity: 0.6; }
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--muted);
-  background: #0f1115;
+  background: var(--inset);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 9px 11px;
   margin-bottom: 10px;
 }
-.identity.ok { color: #b6f0c2; border-color: var(--green); background: rgba(52, 199, 89, 0.1); }
-.identity.warnish { color: #ffd9a0; border-color: var(--amber); background: rgba(255, 159, 10, 0.1); }
+.identity.ok { color: #e3f39a; border-color: var(--green); background: rgba(204, 237, 3, 0.12); }
+.identity.warnish { color: #f6e6a6; border-color: var(--amber); background: rgba(242, 214, 88, 0.12); }
 
 .hint { font-size: 11.5px; color: var(--muted); margin: 6px 0 10px; line-height: 1.5; }
 .hint a { color: var(--accent); cursor: pointer; }
@@ -109,9 +123,9 @@ select:disabled { opacity: 0.6; }
 .radio b { font-weight: 600; }
 
 .warn {
-  background: rgba(255, 159, 10, 0.12);
+  background: rgba(242, 214, 88, 0.12);
   border: 1px solid var(--amber);
-  color: #ffd9a0;
+  color: #f6e6a6;
   border-radius: 8px; padding: 9px 11px; font-size: 12px; margin-top: 6px;
 }
 /* Persistent, always-on notice — quieter so it informs without nagging. */
@@ -126,8 +140,8 @@ select:disabled { opacity: 0.6; }
 .advanced summary { cursor: pointer; color: var(--muted); padding: 6px 0; }
 
 .msg { border-radius: 8px; padding: 9px 11px; font-size: 12.5px; margin-top: 10px; }
-.msg.ok { background: rgba(52, 199, 89, 0.12); border: 1px solid var(--green); color: #b6f0c2; }
-.msg.error { background: rgba(255, 69, 58, 0.12); border: 1px solid var(--red); color: #ffb4ae; }
+.msg.ok { background: rgba(204, 237, 3, 0.12); border: 1px solid var(--green); color: #e3f39a; }
+.msg.error { background: rgba(255, 116, 119, 0.14); border: 1px solid var(--red); color: #ffc7c8; }
 
 .secondary { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
 
@@ -172,7 +186,7 @@ select:disabled { opacity: 0.6; }
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  background: #0f1115;
+  background: var(--inset);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 9px 11px;
@@ -202,6 +216,12 @@ select:disabled { opacity: 0.6; }
   font-weight: 700;
   line-height: 1;
   color: var(--accent);
+  /* Fixed height so a big "Face N" and a small Adventure name occupy the same
+     space — no reflow when flipping between faces. */
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .face.idle { color: var(--muted); }
 /* When showing an Adventure name instead of a number: smaller, wraps cleanly. */
@@ -222,9 +242,9 @@ select:disabled { opacity: 0.6; }
   letter-spacing: 0.03em;
   color: #fff;
 }
-.status-pill.red { background: var(--red); }
-.status-pill.blue { background: var(--accent); }
-.status-pill.green { background: var(--green); }
+.status-pill.red { background: var(--red); color: #2c2b26; }
+.status-pill.blue { background: var(--accent); color: #fff; }
+.status-pill.green { background: var(--green); color: #2c2b26; }
 
 /* Pills under the Adventure name: billable role + deliverable. */
 .chips {
@@ -233,6 +253,8 @@ select:disabled { opacity: 0.6; }
   justify-content: center;
   gap: 6px;
   margin-top: 10px;
+  /* Reserve one pill-row so faces with/without chips don't change height. */
+  min-height: 23px;
 }
 .chip {
   padding: 3px 10px;
@@ -241,17 +263,18 @@ select:disabled { opacity: 0.6; }
   font-weight: 600;
 }
 .role-chip {
-  background: rgba(79, 140, 255, 0.14);
-  border: 1px solid rgba(79, 140, 255, 0.45);
-  color: var(--accent);
+  background: rgba(106, 117, 201, 0.18);
+  border: 1px solid rgba(106, 117, 201, 0.55);
+  color: #aab0ea;
 }
 .deliverable-chip {
-  background: rgba(52, 199, 89, 0.14);
-  border: 1px solid rgba(52, 199, 89, 0.45);
+  background: rgba(204, 237, 3, 0.14);
+  border: 1px solid rgba(204, 237, 3, 0.45);
   color: var(--green);
 }
 
-.face-label { margin-top: 8px; color: var(--muted); font-size: 13px; }
+/* Always reserve the label row (empty while tracking) so it never reflows. */
+.face-label { margin-top: 8px; color: var(--muted); font-size: 13px; min-height: 17px; }
 
 .grid {
   display: grid;
@@ -309,9 +332,9 @@ footer {
 }
 
 .fatal {
-  background: rgba(255, 69, 58, 0.12);
+  background: rgba(255, 116, 119, 0.12);
   border: 1px solid var(--red);
-  color: #ffb4ae;
+  color: #ffc7c8;
   border-radius: 8px;
   padding: 12px;
   font-size: 13px;

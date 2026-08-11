@@ -48,21 +48,20 @@ function render(s) {
   const face = s2.currentFacet > 0 ? s2.currentFacet : s2.deviceFacet;
   const label = $('faceLabel');
   if (s2.tracking) {
-    // Actually logging time — show the Adventure, no redundant "Tracking · face" line.
+    // Actually logging time — show the Adventure, no redundant "Tracking · face"
+    // line. The label row stays (empty) so the card height doesn't change.
     faceEl.textContent = s2.adventureName || `Face ${s2.currentFacet}`;
     faceEl.className = 'face' + (s2.adventureName ? ' name' : '');
-    label.classList.add('hidden');
+    label.textContent = '';
   } else if (face > 0) {
     // A face is up but we are NOT logging it — say exactly why.
     faceEl.textContent = `Face ${face}`;
     faceEl.className = 'face idle';
     label.textContent = s2.notTrackingReason || 'This face isn’t set to track time';
-    label.classList.remove('hidden');
   } else {
     faceEl.textContent = '–';
     faceEl.className = 'face idle';
     label.textContent = s2.connected ? 'No face detected' : 'Looking for your TimeFlip…';
-    label.classList.remove('hidden');
   }
 
   // Status pill: Disconnected (red) / Connected but idle (blue) / Tracking (green).

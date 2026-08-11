@@ -11,8 +11,8 @@ const path = require('path');
 const zlib = require('zlib');
 
 const SIZE = 1024; // 1024 so macOS .icns is crisp; Windows .ico is derived from this too
-const BG = { r: 0x2b, g: 0x5c, b: 0xe6 }; // WxW-ish blue
-const PIP = { r: 0xff, g: 0xff, b: 0xff };
+const BG = { r: 0x6a, g: 0x75, b: 0xc9 }; // WxW brand "Saber"
+const PIP = { r: 0xf2, g: 0xf2, b: 0xf2 }; // WxW brand "Cloud"
 
 // Rounded square geometry, proportional to SIZE.
 const M = SIZE * 0.086; // margin

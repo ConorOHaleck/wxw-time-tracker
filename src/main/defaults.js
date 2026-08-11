@@ -27,13 +27,11 @@ const FIELDS = {
     airtableUserFromAssignee: 'fldbkpJV5rBUcEVyj',
   },
   people: {
-    // Used only to build the "select your name" list. We read the display name,
-    // the linked Airtable User (whose id time is logged under), Status, and
-    // Company — and nothing else, so the sensitive PII fields are never fetched.
+    // Used only to build the "select your name" list. We read only the display
+    // name and the linked Airtable User (whose id time is logged under) — the
+    // sensitive PII fields are never fetched.
     name: 'fld6iNYarSDxlaN83',
     airtableUser: 'fldNsvKz30pzeUtds',
-    status: 'fldMbtMgFEIztIU1D',
-    company: 'flducX6cRJfxtoiyQ',
   },
   faces: {
     faceNumber: 'fldfI8hgi4cLeVh1e',
@@ -83,13 +81,10 @@ const FIELDS = {
   },
 };
 
-// The "select your name" list is limited to active What by When staff.
-const PEOPLE_FILTER = {
-  // The REST API returns a singleSelect value as the option NAME (a string), not
-  // its id — so Status is matched by name. Company is a link, matched by record id.
-  activeStatusName: 'Active',
-  whatByWhenCompanyId: 'rec72L0zvfPLmRVAp',
-};
+// The "select your name" list is driven by the People table's "Active WxW Team"
+// view — it already encodes the active-staff filter, so the app just reads that
+// view instead of fetching and filtering the whole table.
+const PEOPLE_ACTIVE_VIEW = 'viwciJPTd1rSqKhRQ';
 
 const TRACKING_DEFAULTS = {
   pauseFaces: [],
@@ -98,4 +93,4 @@ const TRACKING_DEFAULTS = {
   historyDurationLittleEndian: true,
 };
 
-module.exports = { BASE_ID, TABLES, FIELDS, PEOPLE_FILTER, TRACKING_DEFAULTS };
+module.exports = { BASE_ID, TABLES, FIELDS, PEOPLE_ACTIVE_VIEW, TRACKING_DEFAULTS };
