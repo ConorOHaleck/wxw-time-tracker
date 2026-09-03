@@ -276,6 +276,13 @@ async function init() {
   log.info('app: starting', APP_NAME, 'userData =', userData);
 
   currentSettings = settingsStore.load(userData);
+  // Always start in the real Hours table. Development mode (Hours Testing) never
+  // carries across launches, so the app can never silently keep writing to the
+  // test table — you must deliberately re-enable it each session.
+  if (currentSettings.useProduction !== true) {
+    log.info('app: resetting write target to production Hours');
+    currentSettings = settingsStore.save(userData, { ...currentSettings, useProduction: true });
+  }
   if (settingsStore.isComplete(currentSettings, !!resolveToken(currentSettings))) {
     await startEngine();
   } else {
