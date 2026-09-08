@@ -19,6 +19,14 @@ let chars = {}; // dashed uuid -> BluetoothRemoteGATTCharacteristic
 let stopping = false;
 let reconnectTimer = null;
 
+// The TimeFlip drops its BLE link whenever it's idle or out of range, so
+// reconnect attempts must back off instead of hammering every 3s forever (that
+// produced thousands of failed attempts overnight). Grows on each failure,
+// resets to the floor on a successful connect.
+const RECONNECT_MIN_MS = 3000;
+const RECONNECT_MAX_MS = 60000;
+let reconnectDelay = RECONNECT_MIN_MS;
+
 function send(channel, payload) {
   ipcRenderer.send(channel, payload);
 }
@@ -33,6 +41,7 @@ function fail(message) {
 window.startBle = async function startBle(config) {
   cfg = config;
   stopping = false;
+  reconnectDelay = RECONNECT_MIN_MS;
   try {
     status('scanning');
     device = await pickDevice();
@@ -138,6 +147,7 @@ async function connectGatt() {
   const firmware = await readFirmware(server);
 
   status('ready');
+  reconnectDelay = RECONNECT_MIN_MS; // healthy link — next drop retries promptly
   send('ble:ready', { firmware, deviceName: device.name || null, deviceId: device.id, facet });
 }
 
@@ -162,13 +172,16 @@ function onDisconnected() {
 function scheduleReconnect() {
   if (stopping) return;
   clearTimeout(reconnectTimer);
+  const delay = reconnectDelay;
   reconnectTimer = setTimeout(() => {
     // Reconnect to the same device object — no re-selection needed.
     connectGatt().catch((err) => {
       fail(`reconnect failed: ${err.message}`);
+      // Back off so a sleeping/absent die doesn't spin thousands of attempts.
+      reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
       scheduleReconnect();
     });
-  }, 3000);
+  }, delay);
 }
 
 // ---- command channel from main (bridge._command) ----

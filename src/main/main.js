@@ -159,9 +159,11 @@ function refreshTrayMenu() {
   const configured = settingsStore.isComplete(currentSettings);
   const statusLine = !configured
     ? 'Setup needed'
-    : s.connected
-      ? `Connected — face ${s.currentFacet || '-'}${s.tracking ? ' (tracking)' : ''}`
-      : `Disconnected (${s.bleState || 'idle'})`;
+    : s.paused
+      ? 'Paused'
+      : s.connected
+        ? `Connected — face ${s.currentFacet || '-'}${s.tracking ? ' (tracking)' : ''}`
+        : `Disconnected (${s.bleState || 'idle'})`;
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: statusLine, enabled: false },
@@ -173,6 +175,15 @@ function refreshTrayMenu() {
           if (!mainWindow) createWindow();
           mainWindow.show();
           sendToRenderer('show-setup');
+        },
+      },
+      {
+        label: engine && engine.paused ? 'Resume tracking' : 'Pause tracking',
+        enabled: !!engine,
+        click: () => {
+          if (!engine) return;
+          const p = engine.paused ? engine.resume() : engine.pause();
+          p.then(() => refreshTrayMenu()).catch((e) => log.error(e.message));
         },
       },
       {
@@ -314,6 +325,19 @@ ipcMain.handle('resync-faces', async () => {
   } catch (err) {
     log.error('app: resync faces failed', err.message);
     return { ok: false, error: `Couldn't reload from Airtable: ${err.message}` };
+  }
+});
+
+// Pause or resume tracking from the UI (or tray).
+ipcMain.handle('tracking:set-paused', async (_e, { paused } = {}) => {
+  if (!engine) return { ok: false, error: 'Not connected yet — finish setup first.' };
+  try {
+    const snapshot = paused ? await engine.pause() : await engine.resume();
+    refreshTrayMenu();
+    return { ok: true, snapshot };
+  } catch (err) {
+    log.error('app: set-paused failed', err.message);
+    return { ok: false, error: err.message };
   }
 });
 

@@ -245,6 +245,12 @@ select:disabled { opacity: 0.6; }
 .status-pill.red { background: var(--red); color: #2c2b26; }
 .status-pill.blue { background: var(--accent); color: #fff; }
 .status-pill.green { background: var(--green); color: #2c2b26; }
+.status-pill.amber { background: var(--amber); color: #2c2b26; }
+
+/* Pause / Resume — a single prominent control under the status pill. */
+.pause-row { margin: 0 0 16px; }
+#pauseBtn { width: 100%; }
+#pauseBtn.resume { background: var(--green); color: #2c2b26; }
 
 /* Pills under the Adventure name: billable role + deliverable. */
 .chips {

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('timeflip', {
   getSnapshot: () => ipcRenderer.invoke('get-snapshot'),
   reconcileNow: () => ipcRenderer.invoke('reconcile-now'),
   resyncFaces: () => ipcRenderer.invoke('resync-faces'),
+  setPaused: (paused) => ipcRenderer.invoke('tracking:set-paused', { paused }),
   onSnapshot: (cb) => ipcRenderer.on('snapshot', (_e, data) => cb(data)),
   onFatal: (cb) => ipcRenderer.on('fatal', (_e, msg) => cb(msg)),
   onShowSetup: (cb) => ipcRenderer.on('show-setup', () => cb()),

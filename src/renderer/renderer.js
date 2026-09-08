@@ -47,7 +47,12 @@ function render(s) {
   const faceEl = $('faceBig');
   const face = s2.currentFacet > 0 ? s2.currentFacet : s2.deviceFacet;
   const label = $('faceLabel');
-  if (s2.tracking) {
+  if (s2.paused) {
+    // Paused overrides everything else: no time is being logged.
+    faceEl.textContent = 'Paused';
+    faceEl.className = 'face idle';
+    label.textContent = 'Tracking is paused — no time is being logged.';
+  } else if (s2.tracking) {
     // Actually logging time — show the Adventure, no redundant "Tracking · face"
     // line. The label row stays (empty) so the card height doesn't change.
     faceEl.textContent = s2.adventureName || `Face ${s2.currentFacet}`;
@@ -64,11 +69,15 @@ function render(s) {
     label.textContent = s2.connected ? 'No face detected' : 'Looking for your TimeFlip…';
   }
 
-  // Status pill: Disconnected (red) / Connected but idle (blue) / Tracking (green).
+  // Status pill: Disconnected (red) / Paused (amber) / Tracking (green) /
+  // Connected but idle (blue).
   const pill = $('statusPill');
   if (!s2.connected) {
     pill.textContent = 'Disconnected';
     pill.className = 'status-pill red';
+  } else if (s2.paused) {
+    pill.textContent = 'Paused';
+    pill.className = 'status-pill amber';
   } else if (s2.tracking) {
     pill.textContent = 'Tracking';
     pill.className = 'status-pill green';
@@ -76,6 +85,13 @@ function render(s) {
     pill.textContent = 'Connected';
     pill.className = 'status-pill blue';
   }
+
+  // Pause/Resume button: label + intent reflect the current state. Disabled
+  // until we're connected (there's nothing to pause otherwise).
+  const pauseBtn = $('pauseBtn');
+  pauseBtn.textContent = s2.paused ? 'Resume tracking' : 'Pause tracking';
+  pauseBtn.className = s2.paused ? 'resume' : '';
+  pauseBtn.disabled = !s2.connected && !s2.paused;
 
   // Practice mode — make it obvious this time won't reach payroll.
   $('testingNotice').classList.toggle('hidden', !s2.isTestingTarget);
@@ -340,6 +356,26 @@ $('personSelect').addEventListener('change', () => {
 $('deviceSelect').addEventListener('change', refreshDeviceWarning);
 $('manualDevice').addEventListener('change', updateOverrideVisibility);
 $('saveBtn').addEventListener('click', saveSettings);
+
+$('pauseBtn').addEventListener('click', async () => {
+  const btn = $('pauseBtn');
+  const wantPause = !(snapshot && snapshot.paused);
+  btn.disabled = true;
+  btn.textContent = wantPause ? 'Pausing…' : 'Resuming…';
+  try {
+    const res = await window.timeflip.setPaused(wantPause);
+    if (res && res.ok) {
+      render(res.snapshot);
+    } else {
+      setMsg($('actionMsg'), (res && res.error) || 'Could not change tracking.', 'error');
+      setTimeout(() => $('actionMsg').classList.add('hidden'), 6000);
+      render(snapshot); // restore button from last known state
+    }
+  } catch (err) {
+    setMsg($('actionMsg'), err.message, 'error');
+    render(snapshot);
+  }
+});
 
 $('reconcileBtn').addEventListener('click', async () => {
   const btn = $('reconcileBtn');

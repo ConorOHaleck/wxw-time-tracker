@@ -29,6 +29,12 @@ class BleBridge extends EventEmitter {
     this.win = null; // the hidden BLE BrowserWindow
     this._pending = new Map(); // commandId -> { resolve, reject }
     this._cmdId = 0;
+    // Web Bluetooth allows only ONE GATT operation at a time per device. Every
+    // GATT command is chained onto this promise so a live facet read can't
+    // collide with reconcile's history paging ("GATT operation already in
+    // progress"), which used to throw mid-write and leave the high-water mark
+    // un-advanced — the source of duplicate Hours entries.
+    this._cmdQueue = Promise.resolve();
 
     // Dashed UUIDs for Web Bluetooth.
     this.uuids = {
@@ -146,6 +152,16 @@ class BleBridge extends EventEmitter {
   }
 
   _command(type, payload) {
+    // Serialize onto the GATT queue: the next command starts only after the
+    // previous one settles, so concurrent callers (live facet reads vs. the
+    // reconcile history walk) can never issue overlapping GATT operations.
+    // A failed command doesn't break the chain (both handlers run the next).
+    const run = () => this._dispatch(type, payload);
+    this._cmdQueue = this._cmdQueue.then(run, run);
+    return this._cmdQueue;
+  }
+
+  _dispatch(type, payload) {
     if (!this.win || this.win.isDestroyed()) {
       return Promise.reject(new Error('ble window not available'));
     }
