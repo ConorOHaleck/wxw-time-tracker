@@ -80,7 +80,10 @@ jobs:
             npx electron-builder --win
           elif [ -n "$CSC_LINK" ] && [ -n "$APPLE_ID" ]; then
             echo "Apple credentials present — signing and notarizing."
-            npx electron-builder --mac --config.mac.notarize=true
+            # Pass teamId explicitly: electron-builder 24.13.3's notarize=true
+            # reads APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD from the env but does
+            # not forward APPLE_TEAM_ID, which @electron/notarize requires.
+            npx electron-builder --mac --config.mac.notarize.teamId="$APPLE_TEAM_ID"
           elif [ -n "$CSC_LINK" ]; then
             echo "Developer ID cert present but no notarization credentials — signing only."
             npx electron-builder --mac
