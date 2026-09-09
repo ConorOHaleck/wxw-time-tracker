@@ -22,7 +22,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest
+          # Pinned to macos-13: electron-builder 24.13.3's Developer ID keychain
+          # setup (security set-key-partition-list) fails on the newest macos
+          # runners with "SecKeychainUnlock: passphrase not correct", regardless
+          # of the cert password. macos-13 is a known-good signing environment.
+          - os: macos-13
             platform: mac
           - os: windows-latest
             platform: win
